@@ -1,24 +1,72 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { Stack } from "expo-router";
+import Toast, {
+  BaseToast,
+  ErrorToast,
+  ToastConfig,
+} from "react-native-toast-message";
+import { ThemeProvider, useTheme } from "../contexts/ThemeContext";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+function AppContent() {
+  const { tema } = useTheme();
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
-
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const toastConfig: ToastConfig = {
+    success: (props) => (
+      <BaseToast
+        {...props}
+        style={{
+          borderLeftColor: tema.primary,
+          backgroundColor: tema.card,
+          borderWidth: 1,
+          borderColor: tema.border,
+        }}
+        contentContainerStyle={{ paddingHorizontal: 15 }}
+        text1Style={{
+          fontSize: 16,
+          fontWeight: "bold",
+          color: tema.text,
+        }}
+        text2Style={{
+          fontSize: 14,
+          color: tema.text,
+          opacity: 0.8,
+        }}
+      />
+    ),
+    error: (props) => (
+      <ErrorToast
+        {...props}
+        style={{
+          borderLeftColor: "#dc3545",
+          backgroundColor: tema.card,
+          borderWidth: 1,
+          borderColor: tema.border,
+        }}
+        text1Style={{
+          fontSize: 16,
+          fontWeight: "bold",
+          color: tema.text,
+        }}
+        text2Style={{
+          fontSize: 14,
+          color: tema.text,
+          opacity: 0.8,
+        }}
+      />
+    ),
+  };
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
+    <>
+      <Stack />
+      <Toast config={toastConfig} />
+    </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <AppContent />
     </ThemeProvider>
   );
 }
