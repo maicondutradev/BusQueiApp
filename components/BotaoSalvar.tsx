@@ -1,17 +1,27 @@
-import { StyleSheet, Text, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 
 interface BotaoSalvarTipos {
   onPress: () => void;
   titulo?: string;
+  isLoading?: boolean;
 }
 
 export default function BotaoSalvar({
   onPress,
   titulo = "Salvar",
+  isLoading = false,
 }: BotaoSalvarTipos) {
   return (
-    <TouchableOpacity style={styles.botaoSalvar} onPress={onPress}>
-      <Text style={styles.textoBotao}>{titulo}</Text>
+    <TouchableOpacity 
+      style={[styles.botaoSalvar, isLoading && { opacity: 0.7 }]} 
+      onPress={onPress} 
+      disabled={isLoading}
+    >
+      {isLoading ? (
+        <ActivityIndicator color="#fff" />
+      ) : (
+        <Text style={styles.textoBotao}>{titulo}</Text>
+      )}
     </TouchableOpacity>
   );
 }

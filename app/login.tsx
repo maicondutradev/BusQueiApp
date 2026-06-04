@@ -14,6 +14,7 @@ export default function Login() {
   const { tema, isDarkMode, toggleTheme } = useTheme();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -35,6 +36,7 @@ export default function Login() {
       return;
     }
 
+    setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, senha);
       Toast.show({
@@ -49,6 +51,7 @@ export default function Login() {
       }, 1500);
     } catch (error: any) {
       console.error(error);
+      setIsLoading(false);
       Toast.show({
         type: "error",
         text1: "Acesso Negado",
@@ -86,7 +89,7 @@ export default function Login() {
         secureTextEntry
       />
 
-      <BotaoSalvar titulo="Entrar" onPress={handleLogin} />
+      <BotaoSalvar titulo="Entrar" onPress={handleLogin} isLoading={isLoading} />
 
       <TouchableOpacity
         onPress={() => router.push("/cadastro")}

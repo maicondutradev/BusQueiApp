@@ -15,6 +15,7 @@ export default function Cadastro() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleCadastro = async () => {
     if (!nome || !email || !senha) {
@@ -27,6 +28,7 @@ export default function Cadastro() {
       return;
     }
 
+    setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
       const user = userCredential.user;
@@ -49,6 +51,7 @@ export default function Cadastro() {
       }, 1500);
     } catch (error: any) {
       console.error(error);
+      setIsLoading(false);
       Toast.show({
         type: "error",
         text1: "Ops!",
@@ -88,7 +91,7 @@ export default function Cadastro() {
         secureTextEntry
       />
 
-      <BotaoSalvar titulo="Cadastrar" onPress={handleCadastro} />
+      <BotaoSalvar titulo="Cadastrar" onPress={handleCadastro} isLoading={isLoading} />
     </View>
   );
 }

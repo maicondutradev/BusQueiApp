@@ -58,7 +58,7 @@ function AppContent() {
 
   return (
     <>
-      <Stack />
+      <Stack screenOptions={{ animation: "fade", animationDuration: 300 }} />
       <PWAInstallPrompt />
       <Toast config={toastConfig} />
     </>
