@@ -5,6 +5,7 @@ import Toast, {
   ToastConfig,
 } from "react-native-toast-message";
 import { ThemeProvider, useTheme } from "../contexts/ThemeContext";
+import PWAInstallPrompt from "../components/PWAInstallPrompt";
 
 function AppContent() {
   const { tema } = useTheme();
@@ -58,6 +59,7 @@ function AppContent() {
   return (
     <>
       <Stack />
+      <PWAInstallPrompt />
       <Toast config={toastConfig} />
     </>
   );
