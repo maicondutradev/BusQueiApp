@@ -33,6 +33,7 @@ export default function Index() {
   if (verificando) {
     return (
       <View style={[styles.container, { backgroundColor: tema.background }]}>
+        <Stack.Screen options={{ headerShown: false }} />
         <ActivityIndicator size="large" color={tema.primary} />
       </View>
     );
