@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { Stack, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../services/firebaseConfig";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -17,21 +18,17 @@ export default function Index() {
   const [verificando, setVerificando] = useState(true);
   const { tema, isDarkMode, toggleTheme } = useTheme();
 
-  useFocusEffect(
-    useCallback(() => {
-      const verificarSessao = async () => {
-        const sessao = await AsyncStorage.getItem("sessaoAtiva");
-        if (sessao !== "true") {
-          router.replace("/login");
-        } else {
-          setVerificando(false);
-        }
-      };
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.replace("/login");
+      } else {
+        setVerificando(false);
+      }
+    });
 
-      setVerificando(true);
-      verificarSessao();
-    }, []),
-  );
+    return () => unsubscribe();
+  }, []);
 
   if (verificando) {
     return (
