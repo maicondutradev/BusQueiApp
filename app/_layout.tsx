@@ -59,7 +59,7 @@ function AppContent() {
   return (
     <>
       <Stack screenOptions={{ animation: "fade", animationDuration: 300 }}>
-        <Stack.Screen name="index" options={{ title: "Menu Principal" }} />
+        <Stack.Screen name="index" options={{ title: "BusQuei" }} />
       </Stack>
       <PWAInstallPrompt />
       <Toast config={toastConfig} />
