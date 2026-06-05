@@ -9,8 +9,11 @@ import BotaoSalvar from "../components/BotaoSalvar";
 import InputPadrao from "../components/InputPadrao";
 import { useTheme } from "../contexts/ThemeContext";
 
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 export default function Login() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { tema, isDarkMode, toggleTheme } = useTheme();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -65,7 +68,10 @@ export default function Login() {
     <View style={[styles.container, { backgroundColor: tema.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <TouchableOpacity style={styles.botaoTema} onPress={toggleTheme}>
+      <TouchableOpacity 
+        style={[styles.botaoTema, { top: Math.max(insets.top + 10, 50) }]} 
+        onPress={toggleTheme}
+      >
         <Ionicons
           name={isDarkMode ? "sunny" : "moon"}
           size={28}

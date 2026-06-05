@@ -36,14 +36,28 @@ export default function NovoMotorista() {
 
   const escolherImagem = async () => {
     if (Platform.OS === "web") {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5,
-      });
-      if (!result.canceled) {
-        setFoto(result.assets[0].uri);
+      const isCamera = window.confirm("Deseja usar a Câmera?\n(Clique em Cancelar/Não para abrir a Galeria)");
+      
+      if (isCamera) {
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.5,
+        });
+        if (!result.canceled) {
+          setFoto(result.assets[0].uri);
+        }
+      } else {
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.5,
+        });
+        if (!result.canceled) {
+          setFoto(result.assets[0].uri);
+        }
       }
     } else {
       Alert.alert("Foto do Perfil", "Escolha a origem da foto", [
