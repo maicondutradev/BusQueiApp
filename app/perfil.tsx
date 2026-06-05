@@ -3,7 +3,8 @@ import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebaseConfig";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View, Platform } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View, Platform, Modal } from "react-native";
+import Toast from "react-native-toast-message";
 import BotaoSalvar from "../components/BotaoSalvar";
 import InputPadrao from "../components/InputPadrao";
 import { useTheme } from "../contexts/ThemeContext";
@@ -14,6 +15,7 @@ export default function Perfil() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [modalVisivel, setModalVisivel] = useState(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -42,10 +44,18 @@ export default function Perfil() {
         nome: nome
       });
 
-      Alert.alert("Sucesso", "Perfil atualizado!");
+      Toast.show({
+        type: "success",
+        text1: "Sucesso",
+        text2: "Perfil atualizado!",
+      });
       router.back();
     } catch (error) {
-      Alert.alert("Erro", "Falha ao atualizar o perfil.");
+      Toast.show({
+        type: "error",
+        text1: "Erro",
+        text2: "Falha ao atualizar o perfil.",
+      });
     }
   };
 
@@ -59,53 +69,50 @@ export default function Perfil() {
   };
 
   const handleApagarConta = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    if (Platform.OS === "web") {
-      const confirmed = window.confirm("Tem certeza que deseja apagar sua conta permanentemente? Esta ação não pode ser desfeita.");
-      if (confirmed) {
-        executarExclusao(user);
-      }
-    } else {
-      Alert.alert(
-        "Apagar Conta",
-        "Tem certeza que deseja apagar sua conta permanentemente? Esta ação não pode ser desfeita.",
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: "Sim, apagar", style: "destructive", onPress: () => executarExclusao(user) }
-        ]
-      );
-    }
+    setModalVisivel(true);
   };
 
-  const executarExclusao = async (user: any) => {
+  const executarExclusao = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    setModalVisivel(false);
+
     try {
-      // Tenta apagar do banco de dados primeiro. Se der erro de permissão (ex: regras do Firestore), 
-      // não impede a exclusão da conta no Auth.
       try {
         await deleteDoc(doc(db, "usuarios", user.uid));
       } catch (dbError) {
-        console.warn("Erro ao apagar doc do firestore (possivel erro de regra), continuando para o Auth...", dbError);
+        console.warn("Erro ao apagar doc do firestore", dbError);
       }
       
       await deleteUser(user);
       
-      if (Platform.OS === "web") {
-        window.alert("Sua conta foi removida com sucesso.");
-      } else {
-        Alert.alert("Conta Apagada", "Sua conta foi removida com sucesso.");
-      }
-      router.replace("/login");
+      Toast.show({
+        type: "success",
+        text1: "Conta Apagada",
+        text2: "Sua conta foi removida com sucesso.",
+        position: "top"
+      });
+
+      setTimeout(() => {
+        router.replace("/login");
+      }, 1500);
+
     } catch (error: any) {
       if (error.code === 'auth/requires-recent-login') {
-        const msg = "Para apagar a conta, você precisa ter feito login recentemente. Saia do aplicativo, faça login novamente e tente excluir sua conta.";
-        if (Platform.OS === "web") window.alert(msg);
-        else Alert.alert("Atenção", msg);
+        Toast.show({
+          type: "error",
+          text1: "Atenção de Segurança",
+          text2: "Saia do aplicativo e faça login novamente para excluir a conta.",
+          position: "top"
+        });
       } else {
-        const erroMsg = "Não foi possível apagar a conta.";
-        if (Platform.OS === "web") window.alert(erroMsg);
-        else Alert.alert("Erro", erroMsg);
+        Toast.show({
+          type: "error",
+          text1: "Erro",
+          text2: "Não foi possível apagar a conta.",
+          position: "top"
+        });
         console.error(error);
       }
     }
@@ -140,6 +147,36 @@ export default function Perfil() {
       <TouchableOpacity style={styles.botaoApagar} onPress={handleApagarConta}>
         <Text style={styles.textoBotaoApagar}>Apagar Minha Conta</Text>
       </TouchableOpacity>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisivel}
+        onRequestClose={() => setModalVisivel(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: tema.card }]}>
+            <Text style={[styles.modalTitle, { color: tema.text }]}>Apagar Conta</Text>
+            <Text style={[styles.modalText, { color: tema.text }]}>
+              Tem certeza que deseja apagar sua conta permanentemente? Esta ação não pode ser desfeita.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: "#6c757d" }]} 
+                onPress={() => setModalVisivel(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: "#dc3545" }]} 
+                onPress={executarExclusao}
+              >
+                <Text style={styles.modalButtonText}>Sim, apagar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -166,4 +203,45 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   textoBotaoApagar: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    width: "100%",
+    padding: 25,
+    borderRadius: 12,
+    alignItems: "center",
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 25,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });
