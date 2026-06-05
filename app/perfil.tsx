@@ -1,4 +1,4 @@
-import { signOut, deleteUser } from "firebase/auth";
+import { signOut, deleteUser, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebaseConfig";
 import { Stack, useRouter } from "expo-router";
@@ -16,10 +16,14 @@ export default function Perfil() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [modalVisivel, setModalVisivel] = useState(false);
+  const [modalReauth, setModalReauth] = useState(false);
+  const [senhaReauth, setSenhaReauth] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
+        setCurrentUser(user);
         setEmail(user.email || "");
         try {
           const docSnap = await getDoc(doc(db, "usuarios", user.uid));
@@ -29,6 +33,8 @@ export default function Perfil() {
         } catch (error) {
           console.error(error);
         }
+      } else {
+        setCurrentUser(null);
       }
     });
 
@@ -73,8 +79,16 @@ export default function Perfil() {
   };
 
   const executarExclusao = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
+    const user = currentUser || auth.currentUser;
+    if (!user) {
+      Toast.show({
+        type: "error",
+        text1: "Sessão inválida",
+        text2: "Saia e entre novamente para excluir a conta.",
+        position: "top"
+      });
+      return;
+    }
     
     setModalVisivel(false);
 
@@ -100,12 +114,8 @@ export default function Perfil() {
 
     } catch (error: any) {
       if (error.code === 'auth/requires-recent-login') {
-        Toast.show({
-          type: "error",
-          text1: "Atenção de Segurança",
-          text2: "Saia do aplicativo e faça login novamente para excluir a conta.",
-          position: "top"
-        });
+        setSenhaReauth("");
+        setModalReauth(true);
       } else {
         Toast.show({
           type: "error",
@@ -115,6 +125,44 @@ export default function Perfil() {
         });
         console.error(error);
       }
+    }
+  };
+
+  const executarReauth = async () => {
+    const user = currentUser || auth.currentUser;
+    if (!user || !user.email) return;
+
+    try {
+      const credential = EmailAuthProvider.credential(user.email, senhaReauth);
+      await reauthenticateWithCredential(user, credential);
+      setModalReauth(false);
+
+      try {
+        await deleteDoc(doc(db, "usuarios", user.uid));
+      } catch (dbError) {
+        console.warn("Erro ao apagar doc do firestore", dbError);
+      }
+
+      await deleteUser(user);
+
+      Toast.show({
+        type: "success",
+        text1: "Conta Apagada",
+        text2: "Sua conta foi removida com sucesso.",
+        position: "top"
+      });
+
+      setTimeout(() => {
+        router.replace("/login");
+      }, 1500);
+
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Senha incorreta",
+        text2: "Verifique sua senha e tente novamente.",
+        position: "top"
+      });
     }
   };
 
@@ -172,6 +220,42 @@ export default function Perfil() {
                 onPress={executarExclusao}
               >
                 <Text style={styles.modalButtonText}>Sim, apagar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalReauth}
+        onRequestClose={() => setModalReauth(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: tema.card }]}>
+            <Text style={[styles.modalTitle, { color: tema.text }]}>Confirme sua Identidade</Text>
+            <Text style={[styles.modalText, { color: tema.text }]}>
+              Por segurança, insira sua senha para confirmar a exclusão da conta.
+            </Text>
+            <InputPadrao
+              placeholder="Sua senha atual"
+              value={senhaReauth}
+              onChangeText={setSenhaReauth}
+              secureTextEntry
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: "#6c757d" }]}
+                onPress={() => setModalReauth(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: "#dc3545" }]}
+                onPress={executarReauth}
+              >
+                <Text style={styles.modalButtonText}>Confirmar</Text>
               </TouchableOpacity>
             </View>
           </View>
