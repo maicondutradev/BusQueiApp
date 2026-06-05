@@ -3,10 +3,8 @@ const urlsToCache = [
   '/',
   '/index.html',
   '/favicon.ico',
-  '/assets/images/favicon.png',
-  '/assets/images/splash-icon.png',
-  '/assets/images/icon.png',
-  '/_expo/static/js/web/entry-34dad16ed8931582f459cc0b18ef6ee3.js' // It's better to use workbox for dynamic hashes, but for a basic demo we can cache standard routes.
+  '/icon.png',
+  '/manifest.json'
 ];
 
 self.addEventListener('install', event => {
