@@ -119,41 +119,35 @@ export default function NovaRota() {
           onChangeText={setNomeRota}
         />
 
-        <View style={styles.linhaCep}>
-          <InputPadrao
-            style={styles.inputCep}
-            placeholder="CEP"
-            keyboardType="numeric"
-            value={cepOrigem}
-            onChangeText={setCepOrigem}
-            onBlur={() => buscarCep(cepOrigem, setOrigem)}
-            maxLength={8}
-          />
-          <InputPadrao
-            style={styles.inputEndereco}
-            placeholder="Origem"
-            value={origem}
-            onChangeText={setOrigem}
-          />
-        </View>
+        <InputPadrao
+          style={styles.inputCep}
+          placeholder="CEP de Origem (opcional)"
+          keyboardType="numeric"
+          value={cepOrigem}
+          onChangeText={setCepOrigem}
+          onBlur={() => buscarCep(cepOrigem, setOrigem)}
+          maxLength={8}
+        />
+        <InputPadrao
+          placeholder="Origem"
+          value={origem}
+          onChangeText={setOrigem}
+        />
 
-        <View style={styles.linhaCep}>
-          <InputPadrao
-            style={styles.inputCep}
-            placeholder="CEP"
-            keyboardType="numeric"
-            value={cepDestino}
-            onChangeText={setCepDestino}
-            onBlur={() => buscarCep(cepDestino, setDestino)}
-            maxLength={8}
-          />
-          <InputPadrao
-            style={styles.inputEndereco}
-            placeholder="Destino"
-            value={destino}
-            onChangeText={setDestino}
-          />
-        </View>
+        <InputPadrao
+          style={styles.inputCep}
+          placeholder="CEP de Destino (opcional)"
+          keyboardType="numeric"
+          value={cepDestino}
+          onChangeText={setCepDestino}
+          onBlur={() => buscarCep(cepDestino, setDestino)}
+          maxLength={8}
+        />
+        <InputPadrao
+          placeholder="Destino"
+          value={destino}
+          onChangeText={setDestino}
+        />
 
         <BotaoSalvar
           titulo={isEdicao ? "Atualizar Rota" : "Salvar"}
@@ -173,7 +167,5 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     textAlign: "center",
   },
-  linhaCep: { flexDirection: "row", justifyContent: "space-between" },
-  inputCep: { flex: 0.3, marginRight: 10 },
-  inputEndereco: { flex: 0.7 },
+  inputCep: { marginBottom: -8 },
 });
