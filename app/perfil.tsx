@@ -81,8 +81,16 @@ export default function Perfil() {
 
   const executarExclusao = async (user: any) => {
     try {
-      await deleteDoc(doc(db, "usuarios", user.uid));
+      // Tenta apagar do banco de dados primeiro. Se der erro de permissão (ex: regras do Firestore), 
+      // não impede a exclusão da conta no Auth.
+      try {
+        await deleteDoc(doc(db, "usuarios", user.uid));
+      } catch (dbError) {
+        console.warn("Erro ao apagar doc do firestore (possivel erro de regra), continuando para o Auth...", dbError);
+      }
+      
       await deleteUser(user);
+      
       if (Platform.OS === "web") {
         window.alert("Sua conta foi removida com sucesso.");
       } else {
