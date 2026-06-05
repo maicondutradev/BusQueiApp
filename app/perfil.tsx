@@ -1,9 +1,9 @@
-import { signOut } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { signOut, deleteUser } from "firebase/auth";
+import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebaseConfig";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View, Platform } from "react-native";
 import BotaoSalvar from "../components/BotaoSalvar";
 import InputPadrao from "../components/InputPadrao";
 import { useTheme } from "../contexts/ThemeContext";
@@ -58,6 +58,50 @@ export default function Perfil() {
     }
   };
 
+  const handleApagarConta = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm("Tem certeza que deseja apagar sua conta permanentemente? Esta ação não pode ser desfeita.");
+      if (confirmed) {
+        executarExclusao(user);
+      }
+    } else {
+      Alert.alert(
+        "Apagar Conta",
+        "Tem certeza que deseja apagar sua conta permanentemente? Esta ação não pode ser desfeita.",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Sim, apagar", style: "destructive", onPress: () => executarExclusao(user) }
+        ]
+      );
+    }
+  };
+
+  const executarExclusao = async (user: any) => {
+    try {
+      await deleteDoc(doc(db, "usuarios", user.uid));
+      await deleteUser(user);
+      if (Platform.OS === "web") {
+        window.alert("Sua conta foi removida com sucesso.");
+      } else {
+        Alert.alert("Conta Apagada", "Sua conta foi removida com sucesso.");
+      }
+    } catch (error: any) {
+      if (error.code === 'auth/requires-recent-login') {
+        const msg = "Para apagar a conta, você precisa ter feito login recentemente. Saia do aplicativo, faça login novamente e tente excluir sua conta.";
+        if (Platform.OS === "web") window.alert(msg);
+        else Alert.alert("Atenção", msg);
+      } else {
+        const erroMsg = "Não foi possível apagar a conta.";
+        if (Platform.OS === "web") window.alert(erroMsg);
+        else Alert.alert("Erro", erroMsg);
+        console.error(error);
+      }
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: tema.background }]}>
       <Stack.Screen
@@ -83,6 +127,10 @@ export default function Perfil() {
       <TouchableOpacity style={styles.botaoSair} onPress={handleLogout}>
         <Text style={styles.textoBotaoSair}>Sair da Conta</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity style={styles.botaoApagar} onPress={handleApagarConta}>
+        <Text style={styles.textoBotaoApagar}>Apagar Minha Conta</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -94,11 +142,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   botaoSair: {
-    backgroundColor: "#dc3545",
+    backgroundColor: "#ffc107",
     padding: 15,
     borderRadius: 8,
     alignItems: "center",
     marginTop: 20,
   },
-  textoBotaoSair: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  textoBotaoSair: { color: "#000", fontWeight: "bold", fontSize: 16 },
+  botaoApagar: {
+    backgroundColor: "#dc3545",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  textoBotaoApagar: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });
