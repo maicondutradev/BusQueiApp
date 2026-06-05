@@ -52,7 +52,7 @@ export default function Perfil() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // O index.tsx ou login.tsx vai lidar com o redirecionamento
+      router.replace("/login");
     } catch (error) {
       console.error(error);
     }
@@ -88,6 +88,7 @@ export default function Perfil() {
       } else {
         Alert.alert("Conta Apagada", "Sua conta foi removida com sucesso.");
       }
+      router.replace("/login");
     } catch (error: any) {
       if (error.code === 'auth/requires-recent-login') {
         const msg = "Para apagar a conta, você precisa ter feito login recentemente. Saia do aplicativo, faça login novamente e tente excluir sua conta.";
