@@ -16,8 +16,7 @@ export default function Perfil() {
   const [senha, setSenha] = useState("");
 
   useEffect(() => {
-    const carregarDados = async () => {
-      const user = auth.currentUser;
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         setEmail(user.email || "");
         try {
@@ -29,8 +28,9 @@ export default function Perfil() {
           console.error(error);
         }
       }
-    };
-    carregarDados();
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleSalvar = async () => {
