@@ -70,16 +70,12 @@ export default function Motoristas() {
     if (!itemParaDeletar) return;
     setModalVisivel(false);
 
-    try {
-      await deleteDoc(doc(db, "motoristas", itemParaDeletar.id));
-      Toast.show({
-        type: "success",
-        text1: "Excluído",
-        text2: "O motorista foi removido.",
-      });
-    } catch (error) {
-      Toast.show({ type: "error", text1: "Erro ao excluir." });
-    }
+    deleteDoc(doc(db, "motoristas", itemParaDeletar.id)).catch(console.error);
+    Toast.show({
+      type: "success",
+      text1: "Excluído",
+      text2: "O motorista foi removido.",
+    });
 
     setItemParaDeletar(null);
   };

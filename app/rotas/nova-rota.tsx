@@ -81,33 +81,29 @@ export default function NovaRota() {
       return;
     }
 
-    try {
-      if (isEdicao) {
-        await updateDoc(doc(db, "rotas", String(params.id)), {
-          nomeRota,
-          origem,
-          destino,
-        });
-      } else {
-        await addDoc(collection(db, "rotas"), {
-          userId: user.uid,
-          nomeRota,
-          origem,
-          destino,
-          criadoEm: new Date(),
-        });
-      }
-
-      Toast.show({
-        type: "success",
-        text1: isEdicao ? "Rota Atualizada" : "Rota Criada",
-        text2: "As alterações foram guardadas.",
-      });
-
-      setTimeout(() => router.back(), 1000);
-    } catch (error) {
-      Toast.show({ type: "error", text1: "Erro ao salvar." });
+    if (isEdicao) {
+      updateDoc(doc(db, "rotas", String(params.id)), {
+        nomeRota,
+        origem,
+        destino,
+      }).catch(console.error);
+    } else {
+      addDoc(collection(db, "rotas"), {
+        userId: user.uid,
+        nomeRota,
+        origem,
+        destino,
+        criadoEm: new Date(),
+      }).catch(console.error);
     }
+
+    Toast.show({
+      type: "success",
+      text1: isEdicao ? "Rota Atualizada" : "Rota Criada",
+      text2: "As alterações foram guardadas.",
+    });
+
+    setTimeout(() => router.back(), 1000);
   };
 
   return (

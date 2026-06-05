@@ -69,16 +69,12 @@ export default function Rotas() {
     if (!itemParaDeletar) return;
     setModalVisivel(false);
 
-    try {
-      await deleteDoc(doc(db, "rotas", itemParaDeletar.id));
-      Toast.show({
-        type: "success",
-        text1: "Excluído",
-        text2: "A rota foi removida com sucesso.",
-      });
-    } catch (error) {
-      Toast.show({ type: "error", text1: "Erro ao excluir rota." });
-    }
+    deleteDoc(doc(db, "rotas", itemParaDeletar.id)).catch(console.error);
+    Toast.show({
+      type: "success",
+      text1: "Excluído",
+      text2: "A rota foi removida com sucesso.",
+    });
 
     setItemParaDeletar(null);
   };

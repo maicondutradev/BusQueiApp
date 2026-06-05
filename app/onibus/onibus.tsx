@@ -69,16 +69,12 @@ export default function Onibus() {
     if (!itemParaDeletar) return;
     setModalVisivel(false);
 
-    try {
-      await deleteDoc(doc(db, "onibus", itemParaDeletar.id));
-      Toast.show({
-        type: "success",
-        text1: "Excluído",
-        text2: "Veículo removido da frota.",
-      });
-    } catch (error) {
-      Toast.show({ type: "error", text1: "Erro ao excluir." });
-    }
+    deleteDoc(doc(db, "onibus", itemParaDeletar.id)).catch(console.error);
+    Toast.show({
+      type: "success",
+      text1: "Excluído",
+      text2: "Veículo removido da frota.",
+    });
 
     setItemParaDeletar(null);
   };

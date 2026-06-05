@@ -58,39 +58,31 @@ export default function NovoOnibus() {
       return;
     }
 
-    try {
-      if (isEdicao) {
-        await updateDoc(doc(db, "onibus", String(params.id)), {
-          placa,
-          modelo,
-          capacidade,
-        });
-      } else {
-        await addDoc(collection(db, "onibus"), {
-          userId: user.uid,
-          placa,
-          modelo,
-          capacidade,
-          criadoEm: new Date(),
-        });
-      }
-
-      Toast.show({
-        type: "success",
-        text1: "Sucesso!",
-        text2: isEdicao
-          ? "Veículo atualizado."
-          : "Veículo adicionado à sua frota.",
-      });
-
-      setTimeout(() => router.back(), 1000);
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Erro",
-        text2: "Não foi possível guardar os dados.",
-      });
+    if (isEdicao) {
+      updateDoc(doc(db, "onibus", String(params.id)), {
+        placa,
+        modelo,
+        capacidade,
+      }).catch(console.error);
+    } else {
+      addDoc(collection(db, "onibus"), {
+        userId: user.uid,
+        placa,
+        modelo,
+        capacidade,
+        criadoEm: new Date(),
+      }).catch(console.error);
     }
+
+    Toast.show({
+      type: "success",
+      text1: "Sucesso!",
+      text2: isEdicao
+        ? "Veículo atualizado."
+        : "Veículo adicionado à sua frota.",
+    });
+
+    setTimeout(() => router.back(), 1000);
   };
 
   return (

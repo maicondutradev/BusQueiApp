@@ -106,39 +106,31 @@ export default function NovoMotorista() {
       return;
     }
 
-    try {
-      if (isEdicao) {
-        await updateDoc(doc(db, "motoristas", String(params.id)), {
-          nome,
-          cnh,
-          telefone,
-          foto,
-        });
-      } else {
-        await addDoc(collection(db, "motoristas"), {
-          userId: user.uid,
-          nome,
-          cnh,
-          telefone,
-          foto,
-          criadoEm: new Date(),
-        });
-      }
-
-      Toast.show({
-        type: "success",
-        text1: isEdicao ? "Atualizado" : "Salvo",
-        text2: "Dados do motorista armazenados com sucesso.",
-      });
-
-      setTimeout(() => router.back(), 1000);
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Erro",
-        text2: "Não foi possível guardar os dados.",
-      });
+    if (isEdicao) {
+      updateDoc(doc(db, "motoristas", String(params.id)), {
+        nome,
+        cnh,
+        telefone,
+        foto,
+      }).catch(console.error);
+    } else {
+      addDoc(collection(db, "motoristas"), {
+        userId: user.uid,
+        nome,
+        cnh,
+        telefone,
+        foto,
+        criadoEm: new Date(),
+      }).catch(console.error);
     }
+
+    Toast.show({
+      type: "success",
+      text1: isEdicao ? "Atualizado" : "Salvo",
+      text2: "Dados do motorista armazenados com sucesso.",
+    });
+
+    setTimeout(() => router.back(), 1000);
   };
 
   return (
