@@ -1,5 +1,5 @@
 import { signOut, deleteUser, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "../services/firebaseConfig";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -78,6 +78,18 @@ export default function Perfil() {
     setModalVisivel(true);
   };
 
+  const deletarTodosDadosUsuario = async (uid: string) => {
+    const colecoes = ["onibus", "motoristas", "rotas"];
+    for (const colecao of colecoes) {
+      const q = query(collection(db, colecao), where("userId", "==", uid));
+      const snapshot = await getDocs(q);
+      for (const docSnap of snapshot.docs) {
+        await deleteDoc(docSnap.ref).catch(() => {});
+      }
+    }
+    await deleteDoc(doc(db, "usuarios", uid)).catch(() => {});
+  };
+
   const executarExclusao = async () => {
     const user = currentUser || auth.currentUser;
     if (!user) {
@@ -93,18 +105,13 @@ export default function Perfil() {
     setModalVisivel(false);
 
     try {
-      try {
-        await deleteDoc(doc(db, "usuarios", user.uid));
-      } catch (dbError) {
-        console.warn("Erro ao apagar doc do firestore", dbError);
-      }
-      
+      await deletarTodosDadosUsuario(user.uid);
       await deleteUser(user);
       
       Toast.show({
         type: "success",
         text1: "Conta Apagada",
-        text2: "Sua conta foi removida com sucesso.",
+        text2: "Sua conta e todos os dados foram removidos.",
         position: "top"
       });
 
@@ -137,18 +144,13 @@ export default function Perfil() {
       await reauthenticateWithCredential(user, credential);
       setModalReauth(false);
 
-      try {
-        await deleteDoc(doc(db, "usuarios", user.uid));
-      } catch (dbError) {
-        console.warn("Erro ao apagar doc do firestore", dbError);
-      }
-
+      await deletarTodosDadosUsuario(user.uid);
       await deleteUser(user);
 
       Toast.show({
         type: "success",
         text1: "Conta Apagada",
-        text2: "Sua conta foi removida com sucesso.",
+        text2: "Sua conta e todos os dados foram removidos.",
         position: "top"
       });
 
