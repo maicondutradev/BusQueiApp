@@ -14,7 +14,6 @@ export default function Perfil() {
   const { tema } = useTheme();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
   const [modalVisivel, setModalVisivel] = useState(false);
   const [modalReauth, setModalReauth] = useState(false);
   const [senhaReauth, setSenhaReauth] = useState("");

@@ -1,7 +1,8 @@
 import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../services/firebaseConfig";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotoesAcaoCard from "../../components/BotoesAcaoCard";
@@ -24,24 +25,31 @@ export default function Onibus() {
   const [busca, setBusca] = useState("");
   const [modalVisivel, setModalVisivel] = useState(false);
   const [itemParaDeletar, setItemParaDeletar] = useState<{ id: string; modelo: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const carregarOnibus = () => {
-    const user = auth.currentUser;
-    if (!user) return;
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user || null);
+    });
+    return () => unsubscribe();
+  }, []);
 
-    const q = query(collection(db, "onibus"), where("userId", "==", user.uid));
-    
+  const carregarOnibus = useCallback(() => {
+    if (!currentUser) return;
+
+    const q = query(collection(db, "onibus"), where("userId", "==", currentUser.uid));
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const lista = snapshot.docs.map((docSnap) => ({
         id: docSnap.id,
         ...docSnap.data()
       })) as OnibusProps[];
-      
+
       setListaOnibus(lista);
     });
 
     return unsubscribe;
-  };
+  }, [currentUser]);
 
   useFocusEffect(
     useCallback(() => {
@@ -49,7 +57,7 @@ export default function Onibus() {
       return () => {
         if (unsubscribe) unsubscribe();
       };
-    }, []),
+    }, [carregarOnibus]),
   );
 
   const confirmarDelecao = (id: string, modelo: string) => {
@@ -57,17 +65,20 @@ export default function Onibus() {
     setModalVisivel(true);
   };
 
-  const deletarOnibus = () => {
+  const deletarOnibus = async () => {
     if (!itemParaDeletar) return;
     setModalVisivel(false);
 
-    deleteDoc(doc(db, "onibus", itemParaDeletar.id)).catch(() => {});
-
-    Toast.show({
-      type: "success",
-      text1: "Excluído",
-      text2: "Veículo removido da frota.",
-    });
+    try {
+      await deleteDoc(doc(db, "onibus", itemParaDeletar.id));
+      Toast.show({
+        type: "success",
+        text1: "Excluído",
+        text2: "Veículo removido da frota.",
+      });
+    } catch (error) {
+      Toast.show({ type: "error", text1: "Erro ao excluir." });
+    }
 
     setItemParaDeletar(null);
   };
@@ -168,17 +179,11 @@ const styles = StyleSheet.create({
   inputBusca: {
     marginHorizontal: 20,
     marginBottom: 20,
-    backgroundColor: "#ffffff",
     borderWidth: 2,
-    borderColor: "#0056b3",
     borderRadius: 8,
-    color: "#333333",
     elevation: 4,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
   },

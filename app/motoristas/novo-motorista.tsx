@@ -1,12 +1,13 @@
 import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../services/firebaseConfig";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -33,92 +34,59 @@ export default function NovoMotorista() {
   const [foto, setFoto] = useState<string | null>(
     params.foto ? String(params.foto) : null,
   );
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [modalFotoVisivel, setModalFotoVisivel] = useState(false);
 
-  const escolherImagem = async () => {
-    if (Platform.OS === "web") {
-      const isCamera = window.confirm("Deseja usar a Câmera?\n(Clique em Cancelar/Não para abrir a Galeria)");
-      
-      if (isCamera) {
-        const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.5,
-          base64: true,
-        });
-        if (!result.canceled && result.assets[0].base64) {
-          setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
-        }
-      } else {
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.5,
-          base64: true,
-        });
-        if (!result.canceled && result.assets[0].base64) {
-          setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
-        }
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user || null);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const abrirCamera = async () => {
+    setModalFotoVisivel(false);
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Toast.show({ type: "error", text1: "Permissão Negada", text2: "Precisamos de acesso à câmera." });
+        return;
       }
-    } else {
-      Alert.alert("Foto do Perfil", "Escolha a origem da foto", [
-        {
-          text: "Câmera",
-          onPress: async () => {
-            const { status } =
-              await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== "granted") {
-              Toast.show({
-                type: "error",
-                text1: "Permissão Negada",
-                text2: "Precisamos de acesso à câmera.",
-              });
-              return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.5,
-              base64: true,
-            });
-            if (!result.canceled && result.assets[0].base64) {
-              setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
-            }
-          },
-        },
-        {
-          text: "Galeria",
-          onPress: async () => {
-            const { status } =
-              await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== "granted") {
-              Toast.show({
-                type: "error",
-                text1: "Permissão Negada",
-                text2: "Precisamos de acesso à galeria.",
-              });
-              return;
-            }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.5,
-              base64: true,
-            });
-            if (!result.canceled && result.assets[0].base64) {
-              setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
-            }
-          },
-        },
-        { text: "Cancelar", style: "cancel" },
-      ]);
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
     }
   };
 
-  const handleSalvar = () => {
+  const abrirGaleria = async () => {
+    setModalFotoVisivel(false);
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Toast.show({ type: "error", text1: "Permissão Negada", text2: "Precisamos de acesso à galeria." });
+        return;
+      }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const handleSalvar = async () => {
     if (!nome || !cnh || !telefone) {
       Toast.show({
         type: "error",
@@ -128,34 +96,49 @@ export default function NovoMotorista() {
       return;
     }
 
-    const user = auth.currentUser;
-    if (!user) return;
-
-    if (isEdicao) {
-      updateDoc(doc(db, "motoristas", String(params.id)), {
-        nome,
-        cnh,
-        telefone,
-        foto,
-      }).catch(console.error);
-    } else {
-      addDoc(collection(db, "motoristas"), {
-        userId: user.uid,
-        nome,
-        cnh,
-        telefone,
-        foto,
-        criadoEm: new Date(),
-      }).catch(console.error);
+    const user = currentUser;
+    if (!user) {
+      Toast.show({
+        type: "error",
+        text1: "Sessão inválida",
+        text2: "Aguarde um momento e tente novamente.",
+      });
+      return;
     }
 
-    Toast.show({
-      type: "success",
-      text1: isEdicao ? "Atualizado" : "Salvo",
-      text2: "Dados do motorista armazenados com sucesso.",
-    });
+    try {
+      if (isEdicao) {
+        await updateDoc(doc(db, "motoristas", String(params.id)), {
+          nome,
+          cnh,
+          telefone,
+          foto,
+        });
+      } else {
+        await addDoc(collection(db, "motoristas"), {
+          userId: user.uid,
+          nome,
+          cnh,
+          telefone,
+          foto,
+          criadoEm: new Date(),
+        });
+      }
 
-    setTimeout(() => router.back(), 1000);
+      Toast.show({
+        type: "success",
+        text1: isEdicao ? "Atualizado" : "Salvo",
+        text2: "Dados do motorista armazenados com sucesso.",
+      });
+
+      setTimeout(() => router.back(), 1000);
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Erro",
+        text2: "Não foi possível guardar os dados.",
+      });
+    }
   };
 
   return (
@@ -187,7 +170,7 @@ export default function NovoMotorista() {
               styles.botaoFoto,
               { backgroundColor: tema.card, borderColor: tema.primary },
             ]}
-            onPress={escolherImagem}
+            onPress={() => setModalFotoVisivel(true)}
           >
             {foto ? (
               <Image source={{ uri: foto }} style={styles.imagemPerfil} />
@@ -224,6 +207,37 @@ export default function NovoMotorista() {
           onPress={handleSalvar}
         />
       </ScrollView>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalFotoVisivel}
+        onRequestClose={() => setModalFotoVisivel(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: tema.card }]}>
+            <Text style={[styles.modalTitulo, { color: tema.text }]}>Foto do Motorista</Text>
+            <TouchableOpacity
+              style={[styles.modalBotao, { backgroundColor: tema.primary }]}
+              onPress={abrirCamera}
+            >
+              <Text style={styles.modalBotaoTexto}>📷  Câmera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalBotao, { backgroundColor: tema.primary }]}
+              onPress={abrirGaleria}
+            >
+              <Text style={styles.modalBotaoTexto}>🖼️  Galeria</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalBotao, { backgroundColor: "#6c757d" }]}
+              onPress={() => setModalFotoVisivel(false)}
+            >
+              <Text style={styles.modalBotaoTexto}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -249,4 +263,34 @@ const styles = StyleSheet.create({
   },
   textoBotaoFoto: { fontWeight: "bold", textAlign: "center" },
   imagemPerfil: { width: "100%", height: "100%" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 30,
+  },
+  modalContent: {
+    width: "100%",
+    padding: 25,
+    borderRadius: 12,
+    alignItems: "stretch",
+    gap: 12,
+  },
+  modalTitulo: {
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  modalBotao: {
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  modalBotaoTexto: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });

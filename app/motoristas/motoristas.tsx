@@ -1,7 +1,8 @@
 import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../services/firebaseConfig";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, Image, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotoesAcaoCard from "../../components/BotoesAcaoCard";
@@ -25,24 +26,31 @@ export default function Motoristas() {
   const [busca, setBusca] = useState("");
   const [modalVisivel, setModalVisivel] = useState(false);
   const [itemParaDeletar, setItemParaDeletar] = useState<{ id: string; nome: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const carregarMotoristas = () => {
-    const user = auth.currentUser;
-    if (!user) return;
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user || null);
+    });
+    return () => unsubscribe();
+  }, []);
 
-    const q = query(collection(db, "motoristas"), where("userId", "==", user.uid));
-    
+  const carregarMotoristas = useCallback(() => {
+    if (!currentUser) return;
+
+    const q = query(collection(db, "motoristas"), where("userId", "==", currentUser.uid));
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const lista = snapshot.docs.map((docSnap) => ({
         id: docSnap.id,
         ...docSnap.data()
       })) as MotoristaProps[];
-      
+
       setListaMotoristas(lista);
     });
 
     return unsubscribe;
-  };
+  }, [currentUser]);
 
   useFocusEffect(
     useCallback(() => {
@@ -50,7 +58,7 @@ export default function Motoristas() {
       return () => {
         if (unsubscribe) unsubscribe();
       };
-    }, []),
+    }, [carregarMotoristas]),
   );
 
   const confirmarDelecao = (id: string, nome: string) => {
@@ -58,17 +66,20 @@ export default function Motoristas() {
     setModalVisivel(true);
   };
 
-  const deletarMotorista = () => {
+  const deletarMotorista = async () => {
     if (!itemParaDeletar) return;
     setModalVisivel(false);
 
-    deleteDoc(doc(db, "motoristas", itemParaDeletar.id)).catch(() => {});
-
-    Toast.show({
-      type: "success",
-      text1: "Excluído",
-      text2: "O motorista foi removido.",
-    });
+    try {
+      await deleteDoc(doc(db, "motoristas", itemParaDeletar.id));
+      Toast.show({
+        type: "success",
+        text1: "Excluído",
+        text2: "O motorista foi removido.",
+      });
+    } catch (error) {
+      Toast.show({ type: "error", text1: "Erro ao excluir." });
+    }
 
     setItemParaDeletar(null);
   };
