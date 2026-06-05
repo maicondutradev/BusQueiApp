@@ -44,9 +44,10 @@ export default function NovoMotorista() {
           allowsEditing: true,
           aspect: [1, 1],
           quality: 0.5,
+          base64: true,
         });
-        if (!result.canceled) {
-          setFoto(result.assets[0].uri);
+        if (!result.canceled && result.assets[0].base64) {
+          setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
         }
       } else {
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -54,9 +55,10 @@ export default function NovoMotorista() {
           allowsEditing: true,
           aspect: [1, 1],
           quality: 0.5,
+          base64: true,
         });
-        if (!result.canceled) {
-          setFoto(result.assets[0].uri);
+        if (!result.canceled && result.assets[0].base64) {
+          setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
         }
       }
     } else {
@@ -79,9 +81,10 @@ export default function NovoMotorista() {
               allowsEditing: true,
               aspect: [1, 1],
               quality: 0.5,
+              base64: true,
             });
-            if (!result.canceled) {
-              setFoto(result.assets[0].uri);
+            if (!result.canceled && result.assets[0].base64) {
+              setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
             }
           },
         },
@@ -103,9 +106,10 @@ export default function NovoMotorista() {
               allowsEditing: true,
               aspect: [1, 1],
               quality: 0.5,
+              base64: true,
             });
-            if (!result.canceled) {
-              setFoto(result.assets[0].uri);
+            if (!result.canceled && result.assets[0].base64) {
+              setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
             }
           },
         },

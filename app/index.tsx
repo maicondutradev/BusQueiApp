@@ -30,15 +30,6 @@ export default function Index() {
     return () => unsubscribe();
   }, []);
 
-  if (verificando) {
-    return (
-      <View style={[styles.container, { backgroundColor: tema.background }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator size="large" color={tema.primary} />
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: tema.background }]}>
       <Stack.Screen
@@ -57,12 +48,19 @@ export default function Index() {
           ),
         }}
       />
-      <Text style={[styles.titulo, { color: tema.text }]}>BusQuei</Text>
+      
+      {verificando ? (
+        <ActivityIndicator size="large" color={tema.primary} />
+      ) : (
+        <>
+          <Text style={[styles.titulo, { color: tema.text }]}>BusQuei</Text>
 
-      <BotaoMenu titulo="Gerenciar Ônibus" rota="onibus/onibus" />
-      <BotaoMenu titulo="Gerenciar Motoristas" rota="motoristas/motoristas" />
-      <BotaoMenu titulo="Gerenciar Rotas" rota="rotas/rotas" />
-      <BotaoMenu titulo="Meu Perfil" rota="/perfil" />
+          <BotaoMenu titulo="Gerenciar Ônibus" rota="onibus/onibus" />
+          <BotaoMenu titulo="Gerenciar Motoristas" rota="motoristas/motoristas" />
+          <BotaoMenu titulo="Gerenciar Rotas" rota="rotas/rotas" />
+          <BotaoMenu titulo="Meu Perfil" rota="/perfil" />
+        </>
+      )}
     </View>
   );
 }
