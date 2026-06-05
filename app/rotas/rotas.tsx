@@ -2,18 +2,12 @@ import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/f
 import { auth, db } from "../../services/firebaseConfig";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotoesAcaoCard from "../../components/BotoesAcaoCard";
 import FabButton from "../../components/FabButton";
 import InputPadrao from "../../components/InputPadrao";
+import ModalConfirmacao from "../../components/ModalConfirmacao";
 import { useTheme } from "../../contexts/ThemeContext";
 
 interface RotaProps {
@@ -28,6 +22,8 @@ export default function Rotas() {
   const { tema } = useTheme();
   const [listaRotas, setListaRotas] = useState<RotaProps[]>([]);
   const [busca, setBusca] = useState("");
+  const [modalVisivel, setModalVisivel] = useState(false);
+  const [itemParaDeletar, setItemParaDeletar] = useState<{ id: string; nomeRota: string } | null>(null);
 
   const carregarRotas = () => {
     const user = auth.currentUser;
@@ -56,42 +52,24 @@ export default function Rotas() {
     }, []),
   );
 
-  const deletarRota = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, "rotas", id));
-
-      Toast.show({
-        type: "success",
-        text1: "Excluido",
-        text2: "A rota foi removida com sucesso.",
-      });
-    } catch (error) {
-      Toast.show({ type: "error", text1: "Erro ao excluir rota." });
-    }
+  const confirmarDelecao = (id: string, nomeRota: string) => {
+    setItemParaDeletar({ id, nomeRota });
+    setModalVisivel(true);
   };
 
-  const confirmarDelecao = (id: string, nome: string) => {
-    if (Platform.OS === "web") {
-      const confirmado = window.confirm(
-        `Tem certeza que deseja remover a rota: ${nome}?`,
-      );
-      if (confirmado) {
-        deletarRota(id);
-      }
-    } else {
-      Alert.alert(
-        "Excluir Rota",
-        `Tem certeza que deseja remover a rota: ${nome}?`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Excluir",
-            style: "destructive",
-            onPress: () => deletarRota(id),
-          },
-        ],
-      );
-    }
+  const deletarRota = () => {
+    if (!itemParaDeletar) return;
+    setModalVisivel(false);
+
+    deleteDoc(doc(db, "rotas", itemParaDeletar.id)).catch(() => {});
+
+    Toast.show({
+      type: "success",
+      text1: "Excluído",
+      text2: "A rota foi removida com sucesso.",
+    });
+
+    setItemParaDeletar(null);
   };
 
   const listaFiltrada = listaRotas.filter(
@@ -160,6 +138,15 @@ export default function Rotas() {
       />
 
       <FabButton rota="/rotas/nova-rota" />
+
+      <ModalConfirmacao
+        visivel={modalVisivel}
+        titulo="Excluir Rota"
+        mensagem={`Tem certeza que deseja remover a rota: ${itemParaDeletar?.nomeRota}?`}
+        textoBotaoConfirmar="Excluir"
+        onConfirmar={deletarRota}
+        onCancelar={() => setModalVisivel(false)}
+      />
     </View>
   );
 }

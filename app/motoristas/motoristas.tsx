@@ -2,19 +2,12 @@ import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/f
 import { auth, db } from "../../services/firebaseConfig";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  Image,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Image, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotoesAcaoCard from "../../components/BotoesAcaoCard";
 import FabButton from "../../components/FabButton";
 import InputPadrao from "../../components/InputPadrao";
+import ModalConfirmacao from "../../components/ModalConfirmacao";
 import { useTheme } from "../../contexts/ThemeContext";
 
 interface MotoristaProps {
@@ -30,6 +23,8 @@ export default function Motoristas() {
   const { tema } = useTheme();
   const [listaMotoristas, setListaMotoristas] = useState<MotoristaProps[]>([]);
   const [busca, setBusca] = useState("");
+  const [modalVisivel, setModalVisivel] = useState(false);
+  const [itemParaDeletar, setItemParaDeletar] = useState<{ id: string; nome: string } | null>(null);
 
   const carregarMotoristas = () => {
     const user = auth.currentUser;
@@ -58,42 +53,24 @@ export default function Motoristas() {
     }, []),
   );
 
-  const deletarMotorista = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, "motoristas", id));
-
-      Toast.show({
-        type: "success",
-        text1: "Excluído",
-        text2: "O motorista foi removido.",
-      });
-    } catch (error) {
-      Toast.show({ type: "error", text1: "Erro ao excluir." });
-    }
+  const confirmarDelecao = (id: string, nome: string) => {
+    setItemParaDeletar({ id, nome });
+    setModalVisivel(true);
   };
 
-  const confirmarDelecao = (id: string, nome: string) => {
-    if (Platform.OS === "web") {
-      const confirmado = window.confirm(
-        `Tem certeza que deseja remover o motorista(a): ${nome}?`,
-      );
-      if (confirmado) {
-        deletarMotorista(id);
-      }
-    } else {
-      Alert.alert(
-        "Excluir Motorista",
-        `Tem certeza que deseja remover o motorista(a): ${nome}?`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Excluir",
-            style: "destructive",
-            onPress: () => deletarMotorista(id),
-          },
-        ],
-      );
-    }
+  const deletarMotorista = () => {
+    if (!itemParaDeletar) return;
+    setModalVisivel(false);
+
+    deleteDoc(doc(db, "motoristas", itemParaDeletar.id)).catch(() => {});
+
+    Toast.show({
+      type: "success",
+      text1: "Excluído",
+      text2: "O motorista foi removido.",
+    });
+
+    setItemParaDeletar(null);
   };
 
   const listaFiltrada = listaMotoristas.filter(
@@ -179,6 +156,15 @@ export default function Motoristas() {
       />
 
       <FabButton rota="/motoristas/novo-motorista" />
+
+      <ModalConfirmacao
+        visivel={modalVisivel}
+        titulo="Excluir Motorista"
+        mensagem={`Tem certeza que deseja remover o(a) motorista: ${itemParaDeletar?.nome}?`}
+        textoBotaoConfirmar="Excluir"
+        onConfirmar={deletarMotorista}
+        onCancelar={() => setModalVisivel(false)}
+      />
     </View>
   );
 }

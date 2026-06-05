@@ -2,18 +2,12 @@ import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/f
 import { auth, db } from "../../services/firebaseConfig";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotoesAcaoCard from "../../components/BotoesAcaoCard";
 import FabButton from "../../components/FabButton";
 import InputPadrao from "../../components/InputPadrao";
+import ModalConfirmacao from "../../components/ModalConfirmacao";
 import { useTheme } from "../../contexts/ThemeContext";
 
 interface OnibusProps {
@@ -28,6 +22,8 @@ export default function Onibus() {
   const { tema } = useTheme();
   const [listaOnibus, setListaOnibus] = useState<OnibusProps[]>([]);
   const [busca, setBusca] = useState("");
+  const [modalVisivel, setModalVisivel] = useState(false);
+  const [itemParaDeletar, setItemParaDeletar] = useState<{ id: string; modelo: string } | null>(null);
 
   const carregarOnibus = () => {
     const user = auth.currentUser;
@@ -56,42 +52,24 @@ export default function Onibus() {
     }, []),
   );
 
-  const deletarOnibus = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, "onibus", id));
-
-      Toast.show({
-        type: "success",
-        text1: "Excluído",
-        text2: "Veículo removido da frota.",
-      });
-    } catch (error) {
-      Toast.show({ type: "error", text1: "Erro ao excluir." });
-    }
+  const confirmarDelecao = (id: string, modelo: string) => {
+    setItemParaDeletar({ id, modelo });
+    setModalVisivel(true);
   };
 
-  const confirmarDelecao = (id: string, modelo: string) => {
-    if (Platform.OS === "web") {
-      const confirmado = window.confirm(
-        `Tem certeza que deseja remover o ônibus: ${modelo}?`,
-      );
-      if (confirmado) {
-        deletarOnibus(id);
-      }
-    } else {
-      Alert.alert(
-        "Excluir Ônibus",
-        `Tem certeza que deseja remover o ônibus: ${modelo}?`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Excluir",
-            style: "destructive",
-            onPress: () => deletarOnibus(id),
-          },
-        ],
-      );
-    }
+  const deletarOnibus = () => {
+    if (!itemParaDeletar) return;
+    setModalVisivel(false);
+
+    deleteDoc(doc(db, "onibus", itemParaDeletar.id)).catch(() => {});
+
+    Toast.show({
+      type: "success",
+      text1: "Excluído",
+      text2: "Veículo removido da frota.",
+    });
+
+    setItemParaDeletar(null);
   };
 
   const listaFiltrada = listaOnibus.filter(
@@ -166,6 +144,15 @@ export default function Onibus() {
       />
 
       <FabButton rota="/onibus/novo-onibus" />
+
+      <ModalConfirmacao
+        visivel={modalVisivel}
+        titulo="Excluir Ônibus"
+        mensagem={`Tem certeza que deseja remover o ônibus: ${itemParaDeletar?.modelo}?`}
+        textoBotaoConfirmar="Excluir"
+        onConfirmar={deletarOnibus}
+        onCancelar={() => setModalVisivel(false)}
+      />
     </View>
   );
 }
