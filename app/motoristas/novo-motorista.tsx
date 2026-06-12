@@ -44,6 +44,32 @@ export default function NovoMotorista() {
     return () => unsubscribe();
   }, []);
 
+  const comprimirImagem = (base64Original: string): Promise<string> => {
+    return new Promise((resolve) => {
+      if (typeof document === 'undefined') {
+        resolve(`data:image/jpeg;base64,${base64Original}`);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 300;
+        let { width, height } = img;
+        if (width > height) {
+          if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; }
+        } else {
+          if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.4));
+      };
+      img.src = `data:image/jpeg;base64,${base64Original}`;
+    });
+  };
+
   const abrirCamera = async () => {
     setModalFotoVisivel(false);
     if (Platform.OS !== "web") {
@@ -57,11 +83,12 @@ export default function NovoMotorista() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
+      quality: 0.2,
       base64: true,
     });
     if (!result.canceled && result.assets[0].base64) {
-      setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      const fotoComprimida = await comprimirImagem(result.assets[0].base64);
+      setFoto(fotoComprimida);
     }
   };
 
@@ -78,11 +105,12 @@ export default function NovoMotorista() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
+      quality: 0.2,
       base64: true,
     });
     if (!result.canceled && result.assets[0].base64) {
-      setFoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      const fotoComprimida = await comprimirImagem(result.assets[0].base64);
+      setFoto(fotoComprimida);
     }
   };
 
