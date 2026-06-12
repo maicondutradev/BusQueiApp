@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../services/firebaseConfig";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, Image, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotoesAcaoCard from "../../components/BotoesAcaoCard";
 import FabButton from "../../components/FabButton";
@@ -16,7 +16,6 @@ interface MotoristaProps {
   nome: string;
   cnh: string;
   telefone: string;
-  foto: string | null;
 }
 
 export default function Motoristas() {
@@ -94,17 +93,13 @@ export default function Motoristas() {
       ]}
     >
       <View style={styles.cardConteudo}>
-        {item.foto ? (
-          <Image source={{ uri: item.foto }} style={styles.fotoMotorista} />
-        ) : (
-          <View
-            style={[styles.fotoPlaceholder, { backgroundColor: tema.primary }]}
-          >
-            <Text style={styles.fotoIniciais}>
-              {item.nome.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
+        <View
+          style={[styles.fotoPlaceholder, { backgroundColor: tema.primary }]}
+        >
+          <Text style={styles.fotoIniciais}>
+            {item.nome.charAt(0).toUpperCase()}
+          </Text>
+        </View>
         <View style={styles.dadosMotorista}>
           <Text style={[styles.cardTitulo, { color: tema.primary }]}>
             {item.nome}
