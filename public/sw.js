@@ -30,14 +30,26 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
+  const url = new URL(event.request.url);
+
+  // Ignorar extensões do Chrome
+  if (url.protocol === 'chrome-extension:') return;
+
+  // Ignorar requisições do Firebase/Firestore para evitar interceptação de WebSockets/WebChannel e dados desatualizados
+  if (url.hostname.includes('firestore.googleapis.com') || 
+      url.hostname.includes('identitytoolkit.googleapis.com') || 
+      url.hostname.includes('firebaseio.com')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
         if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
+            cache.put(event.request, responseToCache).catch(err => console.log('Cache put error:', err));
+          }).catch(err => console.log('Cache open error:', err));
         }
         return response;
       })
