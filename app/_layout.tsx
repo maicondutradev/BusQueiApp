@@ -1,4 +1,6 @@
 import { Stack } from "expo-router";
+import { Platform } from "react-native";
+import * as Notifications from "expo-notifications";
 import Toast, {
   BaseToast,
   ErrorToast,
@@ -6,6 +8,19 @@ import Toast, {
 } from "react-native-toast-message";
 import { ThemeProvider, useTheme } from "../contexts/ThemeContext";
 import PWAInstallPrompt from "../components/PWAInstallPrompt";
+
+
+if (Platform.OS === "android" || Platform.OS === "ios") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 function AppContent() {
   const { tema } = useTheme();
