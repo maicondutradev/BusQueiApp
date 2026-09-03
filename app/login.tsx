@@ -3,8 +3,7 @@ import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
 import { auth } from "../services/firebaseConfig";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import * as Notifications from "expo-notifications";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotaoSalvar from "../components/BotaoSalvar";
 import InputPadrao from "../components/InputPadrao";
@@ -65,45 +64,6 @@ export default function Login() {
     }
   };
 
-  const handleTestarNotificacao = async () => {
-    if (Platform.OS !== "android") {
-      Toast.show({
-        type: "info",
-        text1: "Apenas Android",
-        text2: "Esta função é exclusiva para dispositivos Android.",
-        position: "top",
-      });
-      return;
-    }
-
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== "granted") {
-      Toast.show({
-        type: "error",
-        text1: "Permissão negada",
-        text2: "Habilite as notificações nas configurações do app.",
-        position: "top",
-      });
-      return;
-    }
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "🚌 BusQuei — Notificação de Teste",
-        body: "Notificações nativas funcionando perfeitamente!",
-        sound: true,
-      },
-      trigger: null,
-    });
-
-    Toast.show({
-      type: "success",
-      text1: "Notificação enviada!",
-      text2: "Verifique a barra de notificações do Android.",
-      position: "top",
-    });
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: tema.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -138,15 +98,6 @@ export default function Login() {
       <BotaoSalvar titulo="Entrar" onPress={handleLogin} isLoading={isLoading} />
 
       <TouchableOpacity
-        style={styles.botaoNotificacao}
-        onPress={handleTestarNotificacao}
-        activeOpacity={0.75}
-      >
-        <Ionicons name="notifications-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-        <Text style={styles.textoBotaoNotificacao}>Testar Notificação</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
         onPress={() => router.push("/cadastro")}
         style={styles.link}
       >
@@ -179,19 +130,4 @@ const styles = StyleSheet.create({
   },
   link: { marginTop: 20, alignItems: "center" },
   textoLink: { fontSize: 16, fontWeight: "bold" },
-  botaoNotificacao: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: "#6c47ff",
-  },
-  textoBotaoNotificacao: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-  },
 });

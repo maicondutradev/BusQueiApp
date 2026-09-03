@@ -66,7 +66,7 @@ export default function PWAInstallPrompt() {
           <Text style={[styles.title, { color: tema.text }]}>Instalar BusQuei</Text>
           {isIOS ? (
             <Text style={[styles.subtitle, { color: tema.text }]}>
-              Toque no botão <Ionicons name="share-outline" size={16} /> abaixo e selecione "Adicionar à Tela de Início".
+              Toque no botão <Ionicons name="share-outline" size={16} /> abaixo e selecione &quot;Adicionar à Tela de Início&quot;.
             </Text>
           ) : (
             <Text style={[styles.subtitle, { color: tema.text }]}>

@@ -3,11 +3,13 @@ import { doc, getDoc, updateDoc, deleteDoc, collection, getDocs, query, where } 
 import { auth, db } from "../services/firebaseConfig";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View, Platform, Modal } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Platform, Modal } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
 import BotaoSalvar from "../components/BotaoSalvar";
 import InputPadrao from "../components/InputPadrao";
 import { useTheme } from "../contexts/ThemeContext";
+import { enviarNotificacaoLocal, solicitarPermissaoNotificacao } from "../services/notificationService";
 
 export default function Perfil() {
   const router = useRouter();
@@ -62,6 +64,31 @@ export default function Perfil() {
         text2: "Falha ao atualizar o perfil.",
       });
     }
+  };
+
+  const handleTestarAlertaFrota = async () => {
+    const permitiu = await solicitarPermissaoNotificacao();
+    if (!permitiu && Platform.OS !== "web") {
+      Toast.show({
+        type: "error",
+        text1: "Permissão Negada",
+        text2: "Ative as notificações nas configurações do aparelho.",
+        position: "top",
+      });
+      return;
+    }
+
+    await enviarNotificacaoLocal(
+      "🚌 Central de Operações BusQuei",
+      "Alerta Operacional: Toda a frota ativa está em conformidade com o cronograma."
+    );
+
+    Toast.show({
+      type: "success",
+      text1: "Alerta Disparado",
+      text2: "A notificação da central de operações foi enviada.",
+      position: "top",
+    });
   };
 
   const handleLogout = async () => {
@@ -188,6 +215,19 @@ export default function Perfil() {
       />
 
       <BotaoSalvar titulo="Atualizar Dados" onPress={handleSalvar} />
+
+      <TouchableOpacity
+        style={[styles.cardNotificacao, { backgroundColor: tema.card, borderColor: tema.border }]}
+        onPress={handleTestarAlertaFrota}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="notifications-outline" size={24} color={tema.primary} style={{ marginRight: 12 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.tituloCardNotificacao, { color: tema.text }]}>Alertas da Central de Frota</Text>
+          <Text style={[styles.subtituloCardNotificacao, { color: tema.text }]}>Testar comunicado operacional da empresa</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={tema.text} style={{ opacity: 0.5 }} />
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.botaoSair} onPress={handleLogout}>
         <Text style={styles.textoBotaoSair}>Sair da Conta</Text>
@@ -328,5 +368,22 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  cardNotificacao: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 15,
+  },
+  tituloCardNotificacao: {
+    fontSize: 15,
+    fontWeight: "bold",
+  },
+  subtituloCardNotificacao: {
+    fontSize: 12,
+    marginTop: 2,
+    opacity: 0.7,
   },
 });

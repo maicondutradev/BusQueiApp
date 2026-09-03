@@ -14,6 +14,7 @@ import Toast from "react-native-toast-message";
 import BotaoSalvar from "../../components/BotaoSalvar";
 import InputPadrao from "../../components/InputPadrao";
 import { useTheme } from "../../contexts/ThemeContext";
+import { enviarNotificacaoLocal } from "../../services/notificationService";
 
 export default function NovoOnibus() {
   const router = useRouter();
@@ -81,6 +82,13 @@ export default function NovoOnibus() {
         ? "Veículo atualizado."
         : "Veículo adicionado à sua frota.",
     });
+
+    await enviarNotificacaoLocal(
+      "🚌 Frota BusQuei",
+      isEdicao
+        ? `O veículo ${modelo} (Placa ${placa}) foi atualizado na frota.`
+        : `O veículo ${modelo} (Placa ${placa}) foi adicionado à frota.`
+    );
 
     setTimeout(() => router.back(), 1000);
   };

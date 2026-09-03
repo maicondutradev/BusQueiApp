@@ -9,12 +9,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import BotaoSalvar from "../../components/BotaoSalvar";
 import InputPadrao from "../../components/InputPadrao";
 import { useTheme } from "../../contexts/ThemeContext";
+import { enviarNotificacaoLocal } from "../../services/notificationService";
 
 export default function NovaRota() {
   const router = useRouter();
@@ -102,6 +102,13 @@ export default function NovaRota() {
       text1: isEdicao ? "Rota Atualizada" : "Rota Criada",
       text2: "As alterações foram guardadas.",
     });
+
+    await enviarNotificacaoLocal(
+      "🚦 Malha de Rotas BusQuei",
+      isEdicao
+        ? `O trajeto da linha ${nomeRota} foi atualizado.`
+        : `Nova rota cadastrada: ${nomeRota} (${origem} ➔ ${destino}).`
+    );
 
     setTimeout(() => router.back(), 1000);
   };
