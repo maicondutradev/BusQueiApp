@@ -1,6 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeAuth } from "firebase/auth";
+const { getReactNativePersistence } = require("firebase/auth");
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from "firebase/firestore";
+import { Platform } from "react-native";
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -14,13 +17,17 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-const auth = getAuth(app);
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
 
-// Determina se está rodando no navegador/cliente
-const isBrowser = typeof window !== "undefined";
+const isWebWithIndexedDB =
+  Platform.OS === "web" &&
+  typeof window !== "undefined" &&
+  typeof window.indexedDB !== "undefined";
 
 const db = initializeFirestore(app, {
-  localCache: isBrowser 
+  localCache: isWebWithIndexedDB
     ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     : memoryLocalCache()
 });

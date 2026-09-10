@@ -1,6 +1,6 @@
-import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "../../services/firebaseConfig";
+import { auth } from "../../services/firebaseConfig";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -14,10 +14,12 @@ import Toast from "react-native-toast-message";
 import BotaoSalvar from "../../components/BotaoSalvar";
 import InputPadrao from "../../components/InputPadrao";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useSync } from "../../contexts/SyncContext";
 
 export default function NovoMotorista() {
   const router = useRouter();
   const { tema } = useTheme();
+  const { enfileirarDado, isConnected } = useSync();
   const params = useLocalSearchParams();
   const isEdicao = !!params.id;
 
@@ -26,11 +28,23 @@ export default function NovoMotorista() {
   const [telefone, setTelefone] = useState(
     params.telefone ? String(params.telefone) : "",
   );
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(auth.currentUser || null);
 
   useEffect(() => {
+    if (auth.currentUser) {
+      setCurrentUser(auth.currentUser);
+    } else {
+      AsyncStorage.getItem("@busquei_last_uid").then((cachedUid) => {
+        if (cachedUid) {
+          setCurrentUser({ uid: cachedUid });
+        }
+      });
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user || null);
+      if (user) {
+        setCurrentUser(user);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -39,43 +53,45 @@ export default function NovoMotorista() {
     if (!nome || !cnh || !telefone) {
       Toast.show({
         type: "error",
-        text1: "Atenção",
-        text2: "Preencha os dados do motorista.",
+        text1: "Preencha todos os campos.",
       });
       return;
     }
 
-    const user = currentUser;
+    let user = currentUser || auth.currentUser;
+    if (!user) {
+      const cachedUid = await AsyncStorage.getItem("@busquei_last_uid");
+      if (cachedUid) {
+        user = { uid: cachedUid };
+      }
+    }
+
     if (!user) {
       Toast.show({
         type: "error",
-        text1: "Sessão inválida",
-        text2: "Aguarde um momento e tente novamente.",
+        text1: "Sessão inválida.",
       });
       return;
     }
 
-    if (isEdicao) {
-      updateDoc(doc(db, "motoristas", String(params.id)), {
-        nome,
-        cnh,
-        telefone,
-      }).catch(console.error);
-    } else {
-      addDoc(collection(db, "motoristas"), {
-        userId: user.uid,
-        nome,
-        cnh,
-        telefone,
-        criadoEm: new Date(),
-      }).catch(console.error);
-    }
+    const data = isEdicao
+      ? { nome, cnh, telefone }
+      : { userId: user.uid, nome, cnh, telefone, criadoEm: Date.now() };
 
-    Toast.show({
-      type: "success",
-      text1: isEdicao ? "Atualizado" : "Salvo",
-      text2: "Dados do motorista armazenados com sucesso.",
-    });
+    await enfileirarDado("motoristas", data, isEdicao, isEdicao ? String(params.id) : undefined);
+
+    if (isConnected) {
+      Toast.show({
+        type: "success",
+        text1: isEdicao ? "Atualizado com sucesso" : "Cadastrado com sucesso",
+      });
+    } else {
+      Toast.show({
+        type: "info",
+        text1: isEdicao ? "Atualização salva offline" : "Salvo offline",
+        text2: "Pendente de sincronização com o servidor",
+      });
+    }
 
     setTimeout(() => router.back(), 1000);
   };
@@ -108,16 +124,14 @@ export default function NovoMotorista() {
           value={nome}
           onChangeText={setNome}
         />
-
         <InputPadrao
           placeholder="Número da CNH"
           keyboardType="numeric"
           value={cnh}
           onChangeText={setCnh}
         />
-
         <InputPadrao
-          placeholder="Telefone para Contato"
+          placeholder="Telefone com DDD"
           keyboardType="phone-pad"
           value={telefone}
           onChangeText={setTelefone}

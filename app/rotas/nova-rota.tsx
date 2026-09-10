@@ -1,6 +1,6 @@
-import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "../../services/firebaseConfig";
+import { auth } from "../../services/firebaseConfig";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -15,10 +15,12 @@ import BotaoSalvar from "../../components/BotaoSalvar";
 import InputPadrao from "../../components/InputPadrao";
 import { useTheme } from "../../contexts/ThemeContext";
 import { enviarNotificacaoLocal } from "../../services/notificationService";
+import { useSync } from "../../contexts/SyncContext";
 
 export default function NovaRota() {
   const router = useRouter();
   const { tema } = useTheme();
+  const { enfileirarDado, isConnected } = useSync();
   const params = useLocalSearchParams();
   const isEdicao = !!params.id;
 
@@ -33,11 +35,23 @@ export default function NovaRota() {
   const [destino, setDestino] = useState(
     params.destino ? String(params.destino) : "",
   );
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(auth.currentUser || null);
 
   useEffect(() => {
+    if (auth.currentUser) {
+      setCurrentUser(auth.currentUser);
+    } else {
+      AsyncStorage.getItem("@busquei_last_uid").then((cachedUid) => {
+        if (cachedUid) {
+          setCurrentUser({ uid: cachedUid });
+        }
+      });
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user || null);
+      if (user) {
+        setCurrentUser(user);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -71,37 +85,40 @@ export default function NovaRota() {
       return;
     }
 
-    const user = currentUser;
+    let user = currentUser || auth.currentUser;
+    if (!user) {
+      const cachedUid = await AsyncStorage.getItem("@busquei_last_uid");
+      if (cachedUid) {
+        user = { uid: cachedUid };
+      }
+    }
+
     if (!user) {
       Toast.show({
         type: "error",
-        text1: "Sessão inválida",
-        text2: "Aguarde um momento e tente novamente.",
+        text1: "Sessão inválida.",
       });
       return;
     }
 
-    if (isEdicao) {
-      updateDoc(doc(db, "rotas", String(params.id)), {
-        nomeRota,
-        origem,
-        destino,
-      }).catch(console.error);
-    } else {
-      addDoc(collection(db, "rotas"), {
-        userId: user.uid,
-        nomeRota,
-        origem,
-        destino,
-        criadoEm: new Date(),
-      }).catch(console.error);
-    }
+    const data = isEdicao
+      ? { nomeRota, origem, destino }
+      : { userId: user.uid, nomeRota, origem, destino, criadoEm: Date.now() };
 
-    Toast.show({
-      type: "success",
-      text1: isEdicao ? "Rota Atualizada" : "Rota Criada",
-      text2: "As alterações foram guardadas.",
-    });
+    await enfileirarDado("rotas", data, isEdicao, isEdicao ? String(params.id) : undefined);
+
+    if (isConnected) {
+      Toast.show({
+        type: "success",
+        text1: isEdicao ? "Atualizado com sucesso" : "Cadastrado com sucesso",
+      });
+    } else {
+      Toast.show({
+        type: "info",
+        text1: isEdicao ? "Atualização salva offline" : "Salvo offline",
+        text2: "Pendente de sincronização com o servidor",
+      });
+    }
 
     await enviarNotificacaoLocal(
       "🚦 Malha de Rotas BusQuei",
@@ -132,48 +149,53 @@ export default function NovaRota() {
             headerTintColor: tema.text,
           }}
         />
+
         <Text style={[styles.titulo, { color: tema.text }]}>
-          {isEdicao ? "Editar Trajeto" : "Adicionar Rota"}
+          {isEdicao ? "Atualizar Rota" : "Cadastrar Linha"}
         </Text>
 
         <InputPadrao
-          placeholder="Nome da Rota (ex: Linha 42)"
+          placeholder="Nome ou Código da Linha"
           value={nomeRota}
           onChangeText={setNomeRota}
         />
 
         <InputPadrao
-          style={styles.inputCep}
-          placeholder="CEP de Origem (opcional)"
-          keyboardType="numeric"
+          placeholder="CEP de Origem (Ex: 01001-000)"
           value={cepOrigem}
-          onChangeText={setCepOrigem}
-          onBlur={() => buscarCep(cepOrigem, setOrigem)}
-          maxLength={8}
+          onChangeText={(texto) => {
+            setCepOrigem(texto);
+            buscarCep(texto, setOrigem);
+          }}
+          keyboardType="numeric"
+          maxLength={9}
         />
+
         <InputPadrao
-          placeholder="Origem"
+          placeholder="Ponto de Partida (Origem)"
           value={origem}
           onChangeText={setOrigem}
         />
 
         <InputPadrao
-          style={styles.inputCep}
-          placeholder="CEP de Destino (opcional)"
-          keyboardType="numeric"
+          placeholder="CEP de Destino (Ex: 01001-000)"
           value={cepDestino}
-          onChangeText={setCepDestino}
-          onBlur={() => buscarCep(cepDestino, setDestino)}
-          maxLength={8}
+          onChangeText={(texto) => {
+            setCepDestino(texto);
+            buscarCep(texto, setDestino);
+          }}
+          keyboardType="numeric"
+          maxLength={9}
         />
+
         <InputPadrao
-          placeholder="Destino"
+          placeholder="Ponto Final (Destino)"
           value={destino}
           onChangeText={setDestino}
         />
 
         <BotaoSalvar
-          titulo={isEdicao ? "Atualizar Rota" : "Salvar"}
+          titulo={isEdicao ? "Atualizar" : "Salvar"}
           onPress={handleSalvar}
         />
       </ScrollView>
@@ -190,5 +212,4 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     textAlign: "center",
   },
-  inputCep: { marginBottom: -8 },
 });

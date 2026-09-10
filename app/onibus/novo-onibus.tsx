@@ -1,6 +1,6 @@
-import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "../../services/firebaseConfig";
+import { auth } from "../../services/firebaseConfig";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -15,10 +15,12 @@ import BotaoSalvar from "../../components/BotaoSalvar";
 import InputPadrao from "../../components/InputPadrao";
 import { useTheme } from "../../contexts/ThemeContext";
 import { enviarNotificacaoLocal } from "../../services/notificationService";
+import { useSync } from "../../contexts/SyncContext";
 
 export default function NovoOnibus() {
   const router = useRouter();
   const { tema } = useTheme();
+  const { enfileirarDado, isConnected } = useSync();
   const params = useLocalSearchParams();
 
   const isEdicao = !!params.id;
@@ -30,11 +32,23 @@ export default function NovoOnibus() {
   const [capacidade, setCapacidade] = useState(
     params.capacidade ? String(params.capacidade) : "",
   );
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(auth.currentUser || null);
 
   useEffect(() => {
+    if (auth.currentUser) {
+      setCurrentUser(auth.currentUser);
+    } else {
+      AsyncStorage.getItem("@busquei_last_uid").then((cachedUid) => {
+        if (cachedUid) {
+          setCurrentUser({ uid: cachedUid });
+        }
+      });
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user || null);
+      if (user) {
+        setCurrentUser(user);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -43,45 +57,45 @@ export default function NovoOnibus() {
     if (!placa || !modelo || !capacidade) {
       Toast.show({
         type: "error",
-        text1: "Atenção",
-        text2: "Por favor, preencha todos os campos do veículo.",
+        text1: "Preencha todos os campos.",
       });
       return;
     }
 
-    const user = currentUser;
+    let user = currentUser || auth.currentUser;
+    if (!user) {
+      const cachedUid = await AsyncStorage.getItem("@busquei_last_uid");
+      if (cachedUid) {
+        user = { uid: cachedUid };
+      }
+    }
+
     if (!user) {
       Toast.show({
         type: "error",
-        text1: "Sessão inválida",
-        text2: "Aguarde um momento e tente novamente.",
+        text1: "Sessão inválida.",
       });
       return;
     }
 
-    if (isEdicao) {
-      updateDoc(doc(db, "onibus", String(params.id)), {
-        placa,
-        modelo,
-        capacidade,
-      }).catch(console.error);
-    } else {
-      addDoc(collection(db, "onibus"), {
-        userId: user.uid,
-        placa,
-        modelo,
-        capacidade,
-        criadoEm: new Date(),
-      }).catch(console.error);
-    }
+    const data = isEdicao
+      ? { placa, modelo, capacidade }
+      : { userId: user.uid, placa, modelo, capacidade, criadoEm: Date.now() };
 
-    Toast.show({
-      type: "success",
-      text1: "Sucesso!",
-      text2: isEdicao
-        ? "Veículo atualizado."
-        : "Veículo adicionado à sua frota.",
-    });
+    await enfileirarDado("onibus", data, isEdicao, isEdicao ? String(params.id) : undefined);
+
+    if (isConnected) {
+      Toast.show({
+        type: "success",
+        text1: isEdicao ? "Atualizado com sucesso" : "Cadastrado com sucesso",
+      });
+    } else {
+      Toast.show({
+        type: "info",
+        text1: isEdicao ? "Atualização salva offline" : "Salvo offline",
+        text2: "Pendente de sincronização com o servidor",
+      });
+    }
 
     await enviarNotificacaoLocal(
       "🚌 Frota BusQuei",

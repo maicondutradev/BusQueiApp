@@ -7,6 +7,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotaoSalvar from "../components/BotaoSalvar";
 import InputPadrao from "../components/InputPadrao";
+import NetworkIndicator from "../components/NetworkIndicator";
 import { useTheme } from "../contexts/ThemeContext";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -68,16 +69,18 @@ export default function Login() {
     <View style={[styles.container, { backgroundColor: tema.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <TouchableOpacity 
-        style={[styles.botaoTema, { top: Math.max(insets.top + 10, 50) }]} 
-        onPress={toggleTheme}
+      <View 
+        style={[styles.areaSuperiorDireita, { top: Math.max(insets.top + 10, 50) }]} 
       >
-        <Ionicons
-          name={isDarkMode ? "sunny" : "moon"}
-          size={28}
-          color={tema.text}
-        />
-      </TouchableOpacity>
+        <NetworkIndicator />
+        <TouchableOpacity onPress={toggleTheme} style={styles.botaoHeader}>
+          <Ionicons
+            name={isDarkMode ? "sunny" : "moon"}
+            size={28}
+            color={tema.text}
+          />
+        </TouchableOpacity>
+      </View>
 
       <Text style={[styles.titulo, { color: tema.text }]}>BusQuei - Login</Text>
 
@@ -115,11 +118,14 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: "center",
   },
-  botaoTema: {
+  areaSuperiorDireita: {
     position: "absolute",
-    top: 50,
     right: 20,
     zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  botaoHeader: {
     padding: 10,
   },
   titulo: {

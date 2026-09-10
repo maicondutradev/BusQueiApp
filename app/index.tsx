@@ -11,7 +11,9 @@ import {
   View,
 } from "react-native";
 import BotaoMenu from "../components/BotaoMenu";
+import NetworkIndicator from "../components/NetworkIndicator";
 import { useTheme } from "../contexts/ThemeContext";
+import { baixarDadosParaCache } from "../services/offlineCache";
 
 export default function Index() {
   const router = useRouter();
@@ -24,6 +26,7 @@ export default function Index() {
         router.replace("/login");
       } else {
         setVerificando(false);
+        baixarDadosParaCache(user.uid);
       }
     });
 
@@ -38,13 +41,16 @@ export default function Index() {
           headerStyle: { backgroundColor: tema.card },
           headerTintColor: tema.text,
           headerRight: () => (
-            <TouchableOpacity onPress={toggleTheme} style={styles.botaoHeader}>
-              <Ionicons
-                name={isDarkMode ? "sunny" : "moon"}
-                size={24}
-                color={tema.text}
-              />
-            </TouchableOpacity>
+            <View style={styles.headerRightContainer}>
+              <NetworkIndicator />
+              <TouchableOpacity onPress={toggleTheme} style={styles.botaoHeader}>
+                <Ionicons
+                  name={isDarkMode ? "sunny" : "moon"}
+                  size={24}
+                  color={tema.text}
+                />
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
@@ -78,5 +84,9 @@ const styles = StyleSheet.create({
   },
   botaoHeader: {
     padding: 10,
+  },
+  headerRightContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 });

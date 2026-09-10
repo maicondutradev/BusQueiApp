@@ -1,4 +1,4 @@
-import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../services/firebaseConfig";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
@@ -9,55 +9,85 @@ import BotoesAcaoCard from "../../components/BotoesAcaoCard";
 import FabButton from "../../components/FabButton";
 import InputPadrao from "../../components/InputPadrao";
 import ModalConfirmacao from "../../components/ModalConfirmacao";
+import SyncStatusBadge, { RegistroSyncStatus } from "../../components/SyncStatusBadge";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useSync } from "../../contexts/SyncContext";
+import { carregarCacheLocal, salvarCacheLocal } from "../../services/offlineCache";
 
 interface OnibusProps {
   id: string;
   placa: string;
   modelo: string;
   capacidade: string;
+  isOffline?: boolean;
+  clientSyncId?: string;
+  statusSync?: RegistroSyncStatus;
 }
 
 export default function Onibus() {
   const router = useRouter();
   const { tema } = useTheme();
+  const { syncQueue, excluirDado } = useSync();
   const [listaOnibus, setListaOnibus] = useState<OnibusProps[]>([]);
   const [busca, setBusca] = useState("");
   const [modalVisivel, setModalVisivel] = useState(false);
   const [itemParaDeletar, setItemParaDeletar] = useState<{ id: string; modelo: string } | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(auth.currentUser || null);
+
+  const carregarCache = useCallback(async (uid?: string) => {
+    const targetUid = uid || currentUser?.uid || auth.currentUser?.uid;
+    const cached = await carregarCacheLocal<OnibusProps>(targetUid ? `onibus_${targetUid}` : "onibus");
+    if (cached && cached.length > 0) {
+      setListaOnibus(cached);
+    }
+  }, [currentUser]);
 
   useEffect(() => {
+    carregarCache();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user || null);
+      if (user) {
+        carregarCache(user.uid);
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [carregarCache]);
 
   const carregarOnibus = useCallback(() => {
     if (!currentUser) return;
 
     const q = query(collection(db, "onibus"), where("userId", "==", currentUser.uid));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const lista = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data()
-      })) as OnibusProps[];
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const lista = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+          statusSync: "SINCRONIZADO" as RegistroSyncStatus,
+        })) as OnibusProps[];
 
-      setListaOnibus(lista);
-    });
+        if (!snapshot.metadata.fromCache || lista.length > 0) {
+          setListaOnibus(lista);
+          salvarCacheLocal(`onibus_${currentUser.uid}`, lista);
+        }
+      },
+      () => {
+        carregarCache();
+      }
+    );
 
     return unsubscribe;
-  }, [currentUser]);
+  }, [currentUser, carregarCache]);
 
   useFocusEffect(
     useCallback(() => {
+      carregarCache();
       const unsubscribe = carregarOnibus();
       return () => {
         if (unsubscribe) unsubscribe();
       };
-    }, [carregarOnibus]),
+    }, [carregarOnibus, carregarCache]),
   );
 
   const confirmarDelecao = (id: string, modelo: string) => {
@@ -67,19 +97,69 @@ export default function Onibus() {
 
   const deletarOnibus = async () => {
     if (!itemParaDeletar) return;
+    const idParaDeletar = itemParaDeletar.id;
     setModalVisivel(false);
 
-    deleteDoc(doc(db, "onibus", itemParaDeletar.id)).catch(console.error);
+    await excluirDado("onibus", idParaDeletar);
+
+    const novaLista = listaOnibus.filter((o) => o.id !== idParaDeletar);
+    setListaOnibus(novaLista);
+    const uid = currentUser?.uid || auth.currentUser?.uid;
+    if (uid) {
+      salvarCacheLocal(`onibus_${uid}`, novaLista);
+    }
     Toast.show({
       type: "success",
       text1: "Excluído",
-      text2: "Veículo removido da frota.",
     });
 
     setItemParaDeletar(null);
   };
 
-  const listaFiltrada = listaOnibus.filter(
+  const idsExcluidos = new Set(
+    syncQueue
+      .filter((q) => q.collectionName === "onibus" && q.isExclusao && q.idExclusao)
+      .map((q) => q.idExclusao!)
+  );
+
+  const onibusEditados = new Map(
+    syncQueue
+      .filter((q) => q.collectionName === "onibus" && q.isEdicao && q.idEdicao)
+      .map((q) => [
+        q.idEdicao!,
+        { id: q.idEdicao!, ...q.data, isOffline: true, statusSync: q.status as RegistroSyncStatus },
+      ])
+  );
+
+  const listaAtualizada = listaOnibus
+    .filter((item) => !idsExcluidos.has(item.id))
+    .map((item) => {
+      if (onibusEditados.has(item.id)) {
+        return onibusEditados.get(item.id)! as OnibusProps;
+      }
+      return { ...item, statusSync: "SINCRONIZADO" as RegistroSyncStatus };
+    });
+
+  const onibusNovos = syncQueue
+    .filter((q) => {
+      if (q.collectionName !== "onibus" || q.isEdicao || q.isExclusao) return false;
+      const jaExiste = listaAtualizada.some(
+        (o) =>
+          (q.data?.clientSyncId && o.clientSyncId === q.data.clientSyncId) ||
+          (q.data?.placa && o.placa?.trim().toLowerCase() === q.data.placa?.trim().toLowerCase())
+      );
+      return !jaExiste;
+    })
+    .map((q) => ({
+      id: q.id,
+      ...q.data,
+      isOffline: true,
+      statusSync: q.status as RegistroSyncStatus,
+    })) as OnibusProps[];
+
+  const listaCombinada = [...onibusNovos, ...listaAtualizada];
+
+  const listaFiltrada = listaCombinada.filter(
     (item) =>
       item.modelo.toLowerCase().includes(busca.toLowerCase()) ||
       item.placa.toLowerCase().includes(busca.toLowerCase()),
@@ -93,22 +173,31 @@ export default function Onibus() {
       ]}
     >
       <View style={styles.cardConteudo}>
-        <Text style={[styles.cardTitulo, { color: tema.primary }]}>
-          {item.modelo}
-        </Text>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.cardTitulo, { color: tema.primary, flex: 1 }]}>
+            {item.modelo}
+          </Text>
+          <SyncStatusBadge status={item.statusSync || "SINCRONIZADO"} />
+        </View>
         <Text style={[styles.cardTexto, { color: tema.text }]}>
           Placa: {item.placa} | {item.capacidade} Lugares
         </Text>
       </View>
 
       <BotoesAcaoCard
-        onPressEditar={() =>
+        onPressEditar={() => {
+          if (item.statusSync === "PENDENTE" || item.statusSync === "SINCRONIZANDO") {
+            Toast.show({ type: "info", text1: "Aguarde a sincronização para editar." });
+            return;
+          }
           router.push({
             pathname: "/onibus/novo-onibus",
             params: item as any,
-          })
-        }
-        onPressExcluir={() => confirmarDelecao(item.id, item.modelo)}
+          });
+        }}
+        onPressExcluir={() => {
+          confirmarDelecao(item.id, item.modelo);
+        }}
       />
     </View>
   );
@@ -191,6 +280,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cardConteudo: { marginBottom: 10 },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
   cardTitulo: { fontSize: 18, fontWeight: "bold" },
   cardTexto: { fontSize: 14, marginTop: 5 },
   textoVazio: {
