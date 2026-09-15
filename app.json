@@ -58,6 +58,18 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "expo-navigation-bar": {
+        "visibility": "hidden",
+        "behavior": "overlay-swipe",
+        "position": "absolute"
+      },
+      "eas": {
+        "projectId": "5b61c92f-7441-4281-a347-acb31b283a09"
+      }
+    },
+    "owner": "askinasd"
   }
 }
