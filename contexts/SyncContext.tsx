@@ -63,7 +63,16 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       if (queueJson) {
-        setSyncQueue(JSON.parse(queueJson));
+        try {
+          const parsed = JSON.parse(queueJson);
+          if (Array.isArray(parsed)) {
+            setSyncQueue(parsed);
+          } else {
+            await AsyncStorage.removeItem("@sync_queue");
+          }
+        } catch {
+          await AsyncStorage.removeItem("@sync_queue");
+        }
       }
       if (savedTime) {
         setLastSyncTime(savedTime);

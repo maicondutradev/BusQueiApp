@@ -181,23 +181,25 @@ function AppContent() {
   };
 
   return (
-    <NavigationThemeProvider value={navTheme}>
-      <StatusBar style={isDarkMode ? "light" : "dark"} backgroundColor={tema.card} />
-      <Stack
-        screenOptions={{
-          animation: "fade",
-          animationDuration: 200,
-          contentStyle: { backgroundColor: tema.background },
-          headerStyle: { backgroundColor: tema.card },
-          headerTintColor: tema.text,
-          headerRight: () => <NetworkIndicator />,
-        }}
-      >
-        <Stack.Screen name="index" options={{ title: "BusQuei" }} />
-      </Stack>
+    <>
+      <NavigationThemeProvider value={navTheme}>
+        <StatusBar style={isDarkMode ? "light" : "dark"} backgroundColor={tema.card} />
+        <Stack
+          screenOptions={{
+            animation: "fade",
+            animationDuration: 200,
+            contentStyle: { backgroundColor: tema.background },
+            headerStyle: { backgroundColor: tema.card },
+            headerTintColor: tema.text,
+            headerRight: () => <NetworkIndicator />,
+          }}
+        >
+          <Stack.Screen name="index" options={{ title: "BusQuei" }} />
+        </Stack>
+      </NavigationThemeProvider>
       <PWAInstallPrompt />
       <Toast config={toastConfig} visibilityTime={1800} topOffset={48} />
-    </NavigationThemeProvider>
+    </>
   );
 }
 
