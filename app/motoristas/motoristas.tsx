@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../services/firebaseConfig";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotoesAcaoCard from "../../components/BotoesAcaoCard";
 import FabButton from "../../components/FabButton";
@@ -19,6 +19,7 @@ interface MotoristaProps {
   nome: string;
   cnh: string;
   telefone: string;
+  fotoUri?: string | null;
   isOffline?: boolean;
   clientSyncId?: string;
   statusSync?: RegistroSyncStatus;
@@ -173,13 +174,17 @@ export default function Motoristas() {
       ]}
     >
       <View style={styles.cardConteudo}>
-        <View
-          style={[styles.fotoPlaceholder, { backgroundColor: tema.primary }]}
-        >
-          <Text style={styles.fotoIniciais}>
-            {item.nome.charAt(0).toUpperCase()}
-          </Text>
-        </View>
+        {item.fotoUri ? (
+          <Image source={{ uri: item.fotoUri }} style={styles.fotoMotorista} />
+        ) : (
+          <View
+            style={[styles.fotoPlaceholder, { backgroundColor: tema.primary }]}
+          >
+            <Text style={styles.fotoIniciais}>
+              {item.nome.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
         <View style={styles.dadosMotorista}>
           <View style={styles.cardHeaderMotorista}>
             <Text style={[styles.cardTitulo, { color: tema.primary, flex: 1 }]}>
@@ -304,6 +309,12 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
+    marginRight: 15,
+  },
+  fotoMotorista: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     marginRight: 15,
   },
   fotoIniciais: { color: "#fff", fontSize: 20, fontWeight: "bold" },

@@ -4,17 +4,23 @@ import { auth } from "../../services/firebaseConfig";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
 import BotaoSalvar from "../../components/BotaoSalvar";
 import InputPadrao from "../../components/InputPadrao";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useSync } from "../../contexts/SyncContext";
+import { tirarFotoMotorista } from "../../services/cameraService";
 
 export default function NovoMotorista() {
   const router = useRouter();
@@ -28,6 +34,10 @@ export default function NovoMotorista() {
   const [telefone, setTelefone] = useState(
     params.telefone ? String(params.telefone) : "",
   );
+  const [fotoUri, setFotoUri] = useState<string | null>(
+    params.fotoUri ? String(params.fotoUri) : null,
+  );
+  const [carregandoFoto, setCarregandoFoto] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(auth.currentUser || null);
 
   useEffect(() => {
@@ -48,6 +58,51 @@ export default function NovoMotorista() {
     });
     return () => unsubscribe();
   }, []);
+
+  const handleCapturarFoto = async () => {
+    setCarregandoFoto(true);
+    try {
+      const resultado = await tirarFotoMotorista();
+
+      if (resultado.status === "sucesso") {
+        setFotoUri(resultado.uri);
+        Toast.show({
+          type: "success",
+          text1: "Foto capturada",
+          text2: "A imagem foi associada ao cadastro.",
+        });
+      } else if (resultado.status === "permissao_negada") {
+        Toast.show({
+          type: "error",
+          text1: "Permissão de câmera negada",
+          text2: "Habilite a câmera nas configurações do aparelho.",
+        });
+      } else if (resultado.status === "cancelado") {
+        Toast.show({
+          type: "info",
+          text1: "Captura cancelada",
+          text2: "Nenhuma foto foi alterada.",
+        });
+      } else {
+        Toast.show({
+          type: "error",
+          text1: "Falha na câmera",
+          text2: resultado.erro || "Não foi possível abrir a câmera.",
+        });
+      }
+    } finally {
+      setCarregandoFoto(false);
+    }
+  };
+
+  const handleRemoverFoto = () => {
+    setFotoUri(null);
+    Toast.show({
+      type: "info",
+      text1: "Foto descartada",
+      text2: "A imagem rejeitada foi removida da prévia.",
+    });
+  };
 
   const handleSalvar = async () => {
     if (!nome || !cnh || !telefone) {
@@ -75,10 +130,22 @@ export default function NovoMotorista() {
     }
 
     const data = isEdicao
-      ? { nome, cnh, telefone }
-      : { userId: user.uid, nome, cnh, telefone, criadoEm: Date.now() };
+      ? { nome, cnh, telefone, fotoUri: fotoUri || null }
+      : {
+          userId: user.uid,
+          nome,
+          cnh,
+          telefone,
+          fotoUri: fotoUri || null,
+          criadoEm: Date.now(),
+        };
 
-    await enfileirarDado("motoristas", data, isEdicao, isEdicao ? String(params.id) : undefined);
+    await enfileirarDado(
+      "motoristas",
+      data,
+      isEdicao,
+      isEdicao ? String(params.id) : undefined,
+    );
 
     if (isConnected) {
       Toast.show({
@@ -119,6 +186,75 @@ export default function NovoMotorista() {
           {isEdicao ? "Atualizar Motorista" : "Adicionar Motorista"}
         </Text>
 
+        <View style={styles.secaoFoto}>
+          <View
+            style={[
+              styles.avatarContainer,
+              {
+                backgroundColor: tema.card,
+                borderColor: tema.border,
+              },
+            ]}
+          >
+            {fotoUri ? (
+              <Image source={{ uri: fotoUri }} style={styles.fotoAvatar} />
+            ) : (
+              <View style={styles.placeholderAvatar}>
+                <Ionicons
+                  name="person-circle-outline"
+                  size={72}
+                  color={tema.primary}
+                />
+              </View>
+            )}
+          </View>
+
+          <View style={styles.acoesFoto}>
+            <Pressable
+              style={[
+                styles.botaoAcaoFoto,
+                { backgroundColor: tema.primary },
+              ]}
+              onPress={handleCapturarFoto}
+              disabled={carregandoFoto}
+            >
+              {carregandoFoto ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="camera-outline"
+                    size={18}
+                    color="#fff"
+                    style={styles.iconeBotao}
+                  />
+                  <Text style={styles.textoBotaoAcaoFoto}>
+                    {fotoUri ? "Tirar outra foto" : "Fotografar"}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+
+            {fotoUri && (
+              <Pressable
+                style={[
+                  styles.botaoDescartarFoto,
+                  { borderColor: "#ef4444" },
+                ]}
+                onPress={handleRemoverFoto}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={16}
+                  color="#ef4444"
+                  style={styles.iconeBotao}
+                />
+                <Text style={styles.textoDescartarFoto}>Descartar foto</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+
         <InputPadrao
           placeholder="Nome Completo"
           value={nome}
@@ -152,7 +288,63 @@ const styles = StyleSheet.create({
   titulo: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 30,
+    marginBottom: 20,
     textAlign: "center",
+  },
+  secaoFoto: {
+    alignItems: "center",
+    marginBottom: 24,
+    gap: 12,
+  },
+  avatarContainer: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 2,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fotoAvatar: {
+    width: "100%",
+    height: "100%",
+  },
+  placeholderAvatar: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  acoesFoto: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  botaoAcaoFoto: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  iconeBotao: {
+    marginRight: 6,
+  },
+  textoBotaoAcaoFoto: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  botaoDescartarFoto: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: "transparent",
+  },
+  textoDescartarFoto: {
+    color: "#ef4444",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

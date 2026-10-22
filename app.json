@@ -53,6 +53,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Permita que o BusQuei acesse a câmera para registrar a foto do motorista."
+        }
+      ],
+      [
         "expo-navigation-bar",
         {
           "visibility": "hidden",
