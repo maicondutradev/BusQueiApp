@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../services/firebaseConfig";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import BotoesAcaoCard from "../../components/BotoesAcaoCard";
 import FabButton from "../../components/FabButton";
@@ -13,12 +13,18 @@ import SyncStatusBadge, { RegistroSyncStatus } from "../../components/SyncStatus
 import { useTheme } from "../../contexts/ThemeContext";
 import { useSync } from "../../contexts/SyncContext";
 import { carregarCacheLocal, salvarCacheLocal } from "../../services/offlineCache";
+import { capturarLocalizacaoRota, RouteLocation } from "../../services/routeLocation";
 
 interface RotaProps {
   id: string;
   nomeRota: string;
   origem: string;
   destino: string;
+  statusRota?: "PROGRAMADA" | "EM_ANDAMENTO" | "FINALIZADA";
+  iniciadaEm?: string;
+  finalizadaEm?: string;
+  localizacaoInicio?: RouteLocation;
+  localizacaoFim?: RouteLocation;
   isOffline?: boolean;
   clientSyncId?: string;
   statusSync?: RegistroSyncStatus;
@@ -27,12 +33,13 @@ interface RotaProps {
 export default function Rotas() {
   const router = useRouter();
   const { tema } = useTheme();
-  const { syncQueue, excluirDado } = useSync();
+  const { syncQueue, excluirDado, enfileirarDado, isConnected } = useSync();
   const [listaRotas, setListaRotas] = useState<RotaProps[]>([]);
   const [busca, setBusca] = useState("");
   const [modalVisivel, setModalVisivel] = useState(false);
   const [itemParaDeletar, setItemParaDeletar] = useState<{ id: string; nomeRota: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(auth.currentUser || null);
+  const [rotaEmAcao, setRotaEmAcao] = useState<string | null>(null);
 
   const carregarCache = useCallback(async (uid?: string) => {
     const targetUid = uid || currentUser?.uid || auth.currentUser?.uid;
@@ -116,6 +123,93 @@ export default function Rotas() {
     setItemParaDeletar(null);
   };
 
+  const alterarStatusRota = async (rota: RotaProps) => {
+    if (rota.statusSync === "PENDENTE" || rota.statusSync === "SINCRONIZANDO") {
+      Toast.show({
+        type: "info",
+        text1: "Aguarde a sincronização",
+        text2: "A rota precisa estar sincronizada antes de iniciar ou encerrar.",
+      });
+      return;
+    }
+
+    const iniciando = rota.statusRota !== "EM_ANDAMENTO";
+    setRotaEmAcao(rota.id);
+
+    try {
+      const localizacao = await capturarLocalizacaoRota();
+      const alteracoes = iniciando
+        ? {
+            statusRota: "EM_ANDAMENTO" as const,
+            iniciadaEm: localizacao.recordedAt,
+            localizacaoInicio: localizacao,
+          }
+        : {
+            statusRota: "FINALIZADA" as const,
+            finalizadaEm: localizacao.recordedAt,
+            localizacaoFim: localizacao,
+          };
+
+      const rotaAtualizada: RotaProps = {
+        ...rota,
+        ...alteracoes,
+        statusSync: isConnected ? "SINCRONIZANDO" : "PENDENTE",
+      };
+      const novaLista = listaRotas.map((item) =>
+        item.id === rota.id ? rotaAtualizada : item,
+      );
+
+      await enfileirarDado(
+        "rotas",
+        {
+          userId: currentUser?.uid || auth.currentUser?.uid,
+          nomeRota: rota.nomeRota,
+          origem: rota.origem,
+          destino: rota.destino,
+          ...alteracoes,
+        },
+        true,
+        rota.id,
+      );
+      setListaRotas(novaLista);
+      const uid = currentUser?.uid || auth.currentUser?.uid;
+      if (uid) {
+        await salvarCacheLocal(`rotas_${uid}`, novaLista);
+      }
+
+      Toast.show({
+        type: isConnected ? "success" : "info",
+        text1: iniciando ? "Rota iniciada" : "Rota encerrada",
+        text2: isConnected
+          ? "Localização salva com sucesso."
+          : "Localização salva no aparelho e será sincronizada depois.",
+      });
+    } catch (error) {
+      const mensagem = error instanceof Error ? error.message : "";
+      if (mensagem === "LOCATION_PERMISSION_DENIED") {
+        Toast.show({
+          type: "error",
+          text1: "Permissão de localização negada",
+          text2: "Autorize a localização para registrar a rota.",
+        });
+      } else if (mensagem === "LOCATION_SERVICES_DISABLED") {
+        Toast.show({
+          type: "error",
+          text1: "Localização desativada",
+          text2: "Ative o GPS do aparelho e tente novamente.",
+        });
+      } else {
+        Toast.show({
+          type: "error",
+          text1: "Não foi possível obter a localização",
+          text2: "Confira o sinal do GPS e tente novamente.",
+        });
+      }
+    } finally {
+      setRotaEmAcao(null);
+    }
+  };
+
   const idsExcluidos = new Set(
     syncQueue
       .filter((q) => q.collectionName === "rotas" && q.isExclusao && q.idExclusao)
@@ -189,7 +283,46 @@ export default function Rotas() {
         <Text style={[styles.cardTexto, { color: tema.text }]}>
           Para: {item.destino}
         </Text>
+        <Text style={[styles.cardTexto, { color: tema.text }]}>
+          Status: {item.statusRota || "PROGRAMADA"}
+        </Text>
+        {item.localizacaoInicio && (
+          <Text style={[styles.cardTexto, { color: tema.text }]}>
+            Início: {item.localizacaoInicio.latitude.toFixed(5)}, {item.localizacaoInicio.longitude.toFixed(5)}
+          </Text>
+        )}
+        {item.localizacaoFim && (
+          <Text style={[styles.cardTexto, { color: tema.text }]}>
+            Fim: {item.localizacaoFim.latitude.toFixed(5)}, {item.localizacaoFim.longitude.toFixed(5)}
+          </Text>
+        )}
       </View>
+
+      {item.statusRota !== "FINALIZADA" && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={item.statusRota === "EM_ANDAMENTO" ? `Encerrar rota ${item.nomeRota}` : `Iniciar rota ${item.nomeRota}`}
+          disabled={
+            rotaEmAcao === item.id ||
+            item.statusSync === "PENDENTE" ||
+            item.statusSync === "SINCRONIZANDO"
+          }
+          onPress={() => alterarStatusRota(item)}
+          style={({ pressed }) => [
+            styles.botaoRota,
+            { backgroundColor: tema.primary, opacity: pressed ? 0.8 : 1 },
+            (rotaEmAcao === item.id || item.statusSync === "PENDENTE" || item.statusSync === "SINCRONIZANDO") && styles.botaoDesabilitado,
+          ]}
+        >
+          {rotaEmAcao === item.id ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.textoBotaoRota}>
+              {item.statusRota === "EM_ANDAMENTO" ? "Encerrar rota" : "Iniciar rota com GPS"}
+            </Text>
+          )}
+        </Pressable>
+      )}
 
       <BotoesAcaoCard
         onPressEditar={() => {
@@ -298,4 +431,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     opacity: 0.6,
   },
+  botaoRota: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  botaoDesabilitado: { opacity: 0.5 },
+  textoBotaoRota: { color: "#fff", fontWeight: "bold", fontSize: 15 },
 });
