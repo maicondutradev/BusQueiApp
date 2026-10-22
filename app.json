@@ -47,6 +47,12 @@
       "expo-font",
       "expo-web-browser",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permita que o BusQuei registre sua localização ao iniciar e encerrar uma rota."
+        }
+      ],
+      [
         "expo-navigation-bar",
         {
           "visibility": "hidden",
