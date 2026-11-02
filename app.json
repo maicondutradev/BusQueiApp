@@ -13,6 +13,12 @@
     },
     "android": {
       "package": "com.maicondutradev.busquei",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -65,7 +71,9 @@
           "behavior": "overlay-swipe",
           "position": "absolute"
         }
-      ]
+      ],
+      "expo-notifications",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

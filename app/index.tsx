@@ -64,6 +64,7 @@ export default function Index() {
           <BotaoMenu titulo="Gerenciar Ônibus" rota="onibus/onibus" />
           <BotaoMenu titulo="Gerenciar Motoristas" rota="motoristas/motoristas" />
           <BotaoMenu titulo="Gerenciar Rotas" rota="rotas/rotas" />
+          <BotaoMenu titulo="Lembretes de Viagem" rota="lembretes/lembretes" />
           <BotaoMenu titulo="Meu Perfil" rota="/perfil" />
         </>
       )}
