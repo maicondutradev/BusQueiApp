@@ -6,6 +6,7 @@ interface ModalConfirmacaoProps {
   titulo: string;
   mensagem: string;
   textoBotaoConfirmar?: string;
+  corBotaoConfirmar?: string;
   onConfirmar: () => void;
   onCancelar: () => void;
 }
@@ -15,6 +16,7 @@ export default function ModalConfirmacao({
   titulo,
   mensagem,
   textoBotaoConfirmar = "Confirmar",
+  corBotaoConfirmar = "#dc3545",
   onConfirmar,
   onCancelar,
 }: ModalConfirmacaoProps) {
@@ -39,7 +41,7 @@ export default function ModalConfirmacao({
               <Text style={styles.textoBotao}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.botao, { backgroundColor: "#dc3545" }]}
+              style={[styles.botao, { backgroundColor: corBotaoConfirmar }]}
               onPress={onConfirmar}
             >
               <Text style={styles.textoBotao}>{textoBotaoConfirmar}</Text>

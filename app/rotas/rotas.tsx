@@ -14,6 +14,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useSync } from "../../contexts/SyncContext";
 import { carregarCacheLocal, salvarCacheLocal } from "../../services/offlineCache";
 import { capturarLocalizacaoRota, RouteLocation } from "../../services/routeLocation";
+import { enviarNotificacaoLocal } from "../../services/notificationService";
 
 interface RotaProps {
   id: string;
@@ -21,10 +22,10 @@ interface RotaProps {
   origem: string;
   destino: string;
   statusRota?: "PROGRAMADA" | "EM_ANDAMENTO" | "FINALIZADA";
-  iniciadaEm?: string;
-  finalizadaEm?: string;
-  localizacaoInicio?: RouteLocation;
-  localizacaoFim?: RouteLocation;
+  iniciadaEm?: string | null;
+  finalizadaEm?: string | null;
+  localizacaoInicio?: RouteLocation | null;
+  localizacaoFim?: RouteLocation | null;
   isOffline?: boolean;
   clientSyncId?: string;
   statusSync?: RegistroSyncStatus;
@@ -38,6 +39,8 @@ export default function Rotas() {
   const [busca, setBusca] = useState("");
   const [modalVisivel, setModalVisivel] = useState(false);
   const [itemParaDeletar, setItemParaDeletar] = useState<{ id: string; nomeRota: string } | null>(null);
+  const [modalReiniciarVisivel, setModalReiniciarVisivel] = useState(false);
+  const [itemParaReiniciar, setItemParaReiniciar] = useState<RotaProps | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(auth.currentUser || null);
   const [rotaEmAcao, setRotaEmAcao] = useState<string | null>(null);
 
@@ -123,6 +126,87 @@ export default function Rotas() {
     setItemParaDeletar(null);
   };
 
+  const confirmarReinicio = (rota: RotaProps) => {
+    if (rota.statusSync === "PENDENTE" || rota.statusSync === "SINCRONIZANDO") {
+      Toast.show({
+        type: "info",
+        text1: "Aguarde a sincronização",
+        text2: "A rota precisa estar sincronizada antes de ser reiniciada.",
+      });
+      return;
+    }
+    setItemParaReiniciar(rota);
+    setModalReiniciarVisivel(true);
+  };
+
+  const executarReinicioRota = async () => {
+    if (!itemParaReiniciar) return;
+    const rota = itemParaReiniciar;
+    setModalReiniciarVisivel(false);
+    setRotaEmAcao(rota.id);
+
+    try {
+      const alteracoes = {
+        statusRota: "PROGRAMADA" as const,
+        iniciadaEm: null,
+        finalizadaEm: null,
+        localizacaoInicio: null,
+        localizacaoFim: null,
+      };
+
+      const rotaAtualizada: RotaProps = {
+        ...rota,
+        ...alteracoes,
+        statusSync: isConnected ? "SINCRONIZANDO" : "PENDENTE",
+      };
+
+      const novaLista = listaRotas.map((item) =>
+        item.id === rota.id ? rotaAtualizada : item
+      );
+
+      await enfileirarDado(
+        "rotas",
+        {
+          userId: currentUser?.uid || auth.currentUser?.uid,
+          nomeRota: rota.nomeRota,
+          origem: rota.origem,
+          destino: rota.destino,
+          ...alteracoes,
+        },
+        true,
+        rota.id
+      );
+
+      setListaRotas(novaLista);
+      const uid = currentUser?.uid || auth.currentUser?.uid;
+      if (uid) {
+        await salvarCacheLocal(`rotas_${uid}`, novaLista);
+      }
+
+      await enviarNotificacaoLocal(
+        "🔄 Rota Reiniciada",
+        `A linha ${rota.nomeRota} voltou ao status PROGRAMADA e está pronta para nova viagem.`
+      );
+
+      Toast.show({
+        type: isConnected ? "success" : "info",
+        text1: "Rota reiniciada",
+        text2: isConnected
+          ? "Status alterado para PROGRAMADA."
+          : "Reinício salvo offline e será sincronizado.",
+      });
+    } catch {
+      Toast.show({
+        type: "error",
+        text1: "Erro ao reiniciar",
+        text2: "Não foi possível reiniciar a rota.",
+      });
+    } finally {
+      setRotaEmAcao(null);
+      setItemParaReiniciar(null);
+    }
+  };
+
   const alterarStatusRota = async (rota: RotaProps) => {
     if (rota.statusSync === "PENDENTE" || rota.statusSync === "SINCRONIZANDO") {
       Toast.show({
@@ -176,6 +260,13 @@ export default function Rotas() {
       if (uid) {
         await salvarCacheLocal(`rotas_${uid}`, novaLista);
       }
+
+      await enviarNotificacaoLocal(
+        iniciando ? "🚦 Rota Iniciada" : "🏁 Rota Finalizada",
+        iniciando
+          ? `A rota ${rota.nomeRota} iniciou o trajeto com registro de GPS.`
+          : `A rota ${rota.nomeRota} foi finalizada com sucesso.`
+      );
 
       Toast.show({
         type: isConnected ? "success" : "info",
@@ -263,81 +354,162 @@ export default function Rotas() {
       item.destino.toLowerCase().includes(busca.toLowerCase()),
   );
 
-  const renderItem = ({ item }: { item: RotaProps }) => (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: tema.card, borderColor: tema.border },
-      ]}
-    >
-      <View style={styles.cardConteudo}>
-        <View style={styles.cardHeaderRota}>
-          <Text style={[styles.cardTitulo, { color: tema.primary, flex: 1 }]}>
-            {item.nomeRota}
-          </Text>
-          <SyncStatusBadge status={item.statusSync || "SINCRONIZADO"} />
-        </View>
-        <Text style={[styles.cardTexto, { color: tema.text }]}>
-          De: {item.origem}
-        </Text>
-        <Text style={[styles.cardTexto, { color: tema.text }]}>
-          Para: {item.destino}
-        </Text>
-        <Text style={[styles.cardTexto, { color: tema.text }]}>
-          Status: {item.statusRota || "PROGRAMADA"}
-        </Text>
-        {item.localizacaoInicio && (
-          <Text style={[styles.cardTexto, { color: tema.text }]}>
-            Início: {item.localizacaoInicio.latitude.toFixed(5)}, {item.localizacaoInicio.longitude.toFixed(5)}
-          </Text>
-        )}
-        {item.localizacaoFim && (
-          <Text style={[styles.cardTexto, { color: tema.text }]}>
-            Fim: {item.localizacaoFim.latitude.toFixed(5)}, {item.localizacaoFim.longitude.toFixed(5)}
-          </Text>
-        )}
-      </View>
+  const renderItem = ({ item }: { item: RotaProps }) => {
+    const status = item.statusRota || "PROGRAMADA";
+    const statusConfig = {
+      PROGRAMADA: { bg: "#e0f2fe", text: "#0369a1", label: "PROGRAMADA" },
+      EM_ANDAMENTO: { bg: "#dcfce7", text: "#15803d", label: "EM ANDAMENTO" },
+      FINALIZADA: { bg: "#f3e8ff", text: "#7e22ce", label: "FINALIZADA" },
+    }[status] || { bg: "#f3f4f6", text: "#4b5563", label: status };
 
-      {item.statusRota !== "FINALIZADA" && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={item.statusRota === "EM_ANDAMENTO" ? `Encerrar rota ${item.nomeRota}` : `Iniciar rota ${item.nomeRota}`}
-          disabled={
-            rotaEmAcao === item.id ||
-            item.statusSync === "PENDENTE" ||
-            item.statusSync === "SINCRONIZANDO"
-          }
-          onPress={() => alterarStatusRota(item)}
-          style={({ pressed }) => [
-            styles.botaoRota,
-            { backgroundColor: tema.primary, opacity: pressed ? 0.8 : 1 },
-            (rotaEmAcao === item.id || item.statusSync === "PENDENTE" || item.statusSync === "SINCRONIZANDO") && styles.botaoDesabilitado,
-          ]}
-        >
-          {rotaEmAcao === item.id ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.textoBotaoRota}>
-              {item.statusRota === "EM_ANDAMENTO" ? "Encerrar rota" : "Iniciar rota com GPS"}
+    const estaBloqueado =
+      rotaEmAcao === item.id ||
+      item.statusSync === "PENDENTE" ||
+      item.statusSync === "SINCRONIZANDO";
+
+    return (
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: tema.card, borderColor: tema.border },
+        ]}
+      >
+        <View style={styles.cardConteudo}>
+          <View style={styles.cardHeaderRota}>
+            <Text style={[styles.cardTitulo, { color: tema.primary, flex: 1 }]}>
+              {item.nomeRota}
+            </Text>
+            <SyncStatusBadge status={item.statusSync || "SINCRONIZADO"} />
+          </View>
+          <Text style={[styles.cardTexto, { color: tema.text }]}>
+            De: {item.origem}
+          </Text>
+          <Text style={[styles.cardTexto, { color: tema.text }]}>
+            Para: {item.destino}
+          </Text>
+
+          <View style={styles.statusLinha}>
+            <Text style={[styles.cardTexto, { color: tema.text, marginRight: 8 }]}>
+              Status:
+            </Text>
+            <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
+              <Text style={[styles.statusBadgeTexto, { color: statusConfig.text }]}>
+                {statusConfig.label}
+              </Text>
+            </View>
+          </View>
+
+          {item.localizacaoInicio && (
+            <Text style={[styles.cardTexto, { color: tema.text }]}>
+              Início: {item.localizacaoInicio.latitude.toFixed(5)}, {item.localizacaoInicio.longitude.toFixed(5)}
             </Text>
           )}
-        </Pressable>
-      )}
+          {item.localizacaoFim && (
+            <Text style={[styles.cardTexto, { color: tema.text }]}>
+              Fim: {item.localizacaoFim.latitude.toFixed(5)}, {item.localizacaoFim.longitude.toFixed(5)}
+            </Text>
+          )}
+        </View>
 
-      <BotoesAcaoCard
-        onPressEditar={() => {
-          if (item.statusSync === "PENDENTE" || item.statusSync === "SINCRONIZANDO") {
-            Toast.show({ type: "info", text1: "Aguarde a sincronização para editar." });
-            return;
-          }
-          router.push({ pathname: "/rotas/nova-rota", params: item as any });
-        }}
-        onPressExcluir={() => {
-          confirmarDelecao(item.id, item.nomeRota);
-        }}
-      />
-    </View>
-  );
+        {/* Botoes de Acao do Ciclo da Rota */}
+        <View style={styles.acoesCicloContainer}>
+          {status === "PROGRAMADA" && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Iniciar rota ${item.nomeRota}`}
+              disabled={estaBloqueado}
+              onPress={() => alterarStatusRota(item)}
+              style={({ pressed }) => [
+                styles.botaoRota,
+                { backgroundColor: tema.primary, opacity: pressed ? 0.8 : 1 },
+                estaBloqueado && styles.botaoDesabilitado,
+              ]}
+            >
+              {rotaEmAcao === item.id ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.textoBotaoRota}>Iniciar rota com GPS</Text>
+              )}
+            </Pressable>
+          )}
+
+          {status === "EM_ANDAMENTO" && (
+            <View style={styles.linhaBotoesStatus}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Encerrar rota ${item.nomeRota}`}
+                disabled={estaBloqueado}
+                onPress={() => alterarStatusRota(item)}
+                style={({ pressed }) => [
+                  styles.botaoRota,
+                  styles.botaoEncerrar,
+                  { opacity: pressed ? 0.8 : 1 },
+                  estaBloqueado && styles.botaoDesabilitado,
+                ]}
+              >
+                {rotaEmAcao === item.id ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.textoBotaoRota}>Encerrar rota</Text>
+                )}
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Reiniciar rota ${item.nomeRota}`}
+                disabled={estaBloqueado}
+                onPress={() => confirmarReinicio(item)}
+                style={({ pressed }) => [
+                  styles.botaoRota,
+                  styles.botaoReiniciarSecundario,
+                  { borderColor: "#f59e0b", opacity: pressed ? 0.8 : 1 },
+                  estaBloqueado && styles.botaoDesabilitado,
+                ]}
+              >
+                <Text style={[styles.textoBotaoReiniciar, { color: "#d97706" }]}>
+                  Reiniciar
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
+          {status === "FINALIZADA" && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Reiniciar rota ${item.nomeRota}`}
+              disabled={estaBloqueado}
+              onPress={() => confirmarReinicio(item)}
+              style={({ pressed }) => [
+                styles.botaoRota,
+                styles.botaoReiniciarFinalizada,
+                { opacity: pressed ? 0.8 : 1 },
+                estaBloqueado && styles.botaoDesabilitado,
+              ]}
+            >
+              {rotaEmAcao === item.id ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.textoBotaoRota}>🔄 Reiniciar rota</Text>
+              )}
+            </Pressable>
+          )}
+        </View>
+
+        <BotoesAcaoCard
+          onPressEditar={() => {
+            if (item.statusSync === "PENDENTE" || item.statusSync === "SINCRONIZANDO") {
+              Toast.show({ type: "info", text1: "Aguarde a sincronização para editar." });
+              return;
+            }
+            router.push({ pathname: "/rotas/nova-rota", params: item as any });
+          }}
+          onPressExcluir={() => {
+            confirmarDelecao(item.id, item.nomeRota);
+          }}
+        />
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: tema.background }]}>
@@ -386,6 +558,19 @@ export default function Rotas() {
         onConfirmar={deletarRota}
         onCancelar={() => setModalVisivel(false)}
       />
+
+      <ModalConfirmacao
+        visivel={modalReiniciarVisivel}
+        titulo="Reiniciar Rota"
+        mensagem={`Tem certeza que deseja reiniciar a rota "${itemParaReiniciar?.nomeRota}"?\n\nO status retornará para PROGRAMADA e os registros da viagem anterior serão redefinidos para uma nova viagem.`}
+        textoBotaoConfirmar="Reiniciar"
+        corBotaoConfirmar="#f59e0b"
+        onConfirmar={executarReinicioRota}
+        onCancelar={() => {
+          setModalReiniciarVisivel(false);
+          setItemParaReiniciar(null);
+        }}
+      />
     </View>
   );
 }
@@ -425,6 +610,45 @@ const styles = StyleSheet.create({
   },
   cardTitulo: { fontSize: 18, fontWeight: "bold" },
   cardTexto: { fontSize: 14, marginTop: 5 },
+  statusLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusBadgeTexto: {
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  acoesCicloContainer: {
+    marginBottom: 10,
+  },
+  linhaBotoesStatus: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  botaoEncerrar: {
+    flex: 2,
+    backgroundColor: "#dc2626",
+    marginBottom: 0,
+  },
+  botaoReiniciarSecundario: {
+    flex: 1,
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    marginBottom: 0,
+  },
+  botaoReiniciarFinalizada: {
+    backgroundColor: "#d97706",
+  },
+  textoBotaoReiniciar: {
+    fontWeight: "bold",
+    fontSize: 14,
+  },
   textoVazio: {
     textAlign: "center",
     marginTop: 50,

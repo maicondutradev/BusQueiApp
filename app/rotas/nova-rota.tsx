@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import BotaoSalvar from "../../components/BotaoSalvar";
@@ -23,6 +24,7 @@ export default function NovaRota() {
   const { enfileirarDado, isConnected } = useSync();
   const params = useLocalSearchParams();
   const isEdicao = !!params.id;
+  const statusRotaAtual = params.statusRota ? String(params.statusRota) : "PROGRAMADA";
 
   const [nomeRota, setNomeRota] = useState(
     params.nomeRota ? String(params.nomeRota) : "",
@@ -35,6 +37,7 @@ export default function NovaRota() {
   const [destino, setDestino] = useState(
     params.destino ? String(params.destino) : "",
   );
+  const [reiniciarStatus, setReiniciarStatus] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(auth.currentUser || null);
 
   useEffect(() => {
@@ -101,16 +104,30 @@ export default function NovaRota() {
       return;
     }
 
+    const alteracoesReinicio = reiniciarStatus
+      ? {
+          statusRota: "PROGRAMADA",
+          iniciadaEm: null,
+          finalizadaEm: null,
+          localizacaoInicio: null,
+          localizacaoFim: null,
+        }
+      : {};
+
     const data = isEdicao
-      ? { nomeRota, origem, destino }
-      : { userId: user.uid, nomeRota, origem, destino, criadoEm: Date.now() };
+      ? { nomeRota, origem, destino, ...alteracoesReinicio }
+      : { userId: user.uid, nomeRota, origem, destino, statusRota: "PROGRAMADA", criadoEm: Date.now() };
 
     await enfileirarDado("rotas", data, isEdicao, isEdicao ? String(params.id) : undefined);
 
     if (isConnected) {
       Toast.show({
         type: "success",
-        text1: isEdicao ? "Atualizado com sucesso" : "Cadastrado com sucesso",
+        text1: isEdicao
+          ? reiniciarStatus
+            ? "Atualizado e rota reiniciada"
+            : "Atualizado com sucesso"
+          : "Cadastrado com sucesso",
       });
     } else {
       Toast.show({
@@ -123,7 +140,9 @@ export default function NovaRota() {
     await enviarNotificacaoLocal(
       "🚦 Malha de Rotas BusQuei",
       isEdicao
-        ? `O trajeto da linha ${nomeRota} foi atualizado.`
+        ? reiniciarStatus
+          ? `A rota ${nomeRota} foi atualizada e reiniciada para PROGRAMADA.`
+          : `O trajeto da linha ${nomeRota} foi atualizado.`
         : `Nova rota cadastrada: ${nomeRota} (${origem} ➔ ${destino}).`
     );
 
@@ -194,6 +213,33 @@ export default function NovaRota() {
           onChangeText={setDestino}
         />
 
+        {isEdicao && statusRotaAtual !== "PROGRAMADA" && (
+          <TouchableOpacity
+            style={[
+              styles.cardReinicio,
+              {
+                backgroundColor: tema.card,
+                borderColor: reiniciarStatus ? "#16a34a" : "#f59e0b",
+              },
+            ]}
+            onPress={() => setReiniciarStatus(!reiniciarStatus)}
+          >
+            <Text style={[styles.textoReinicioTitulo, { color: tema.text }]}>
+              Status atual: <Text style={{ fontWeight: "bold" }}>{statusRotaAtual}</Text>
+            </Text>
+            <Text
+              style={[
+                styles.textoReinicioSub,
+                { color: reiniciarStatus ? "#16a34a" : "#d97706" },
+              ]}
+            >
+              {reiniciarStatus
+                ? "✓ Rota será reiniciada para PROGRAMADA ao salvar"
+                : "Toque para reiniciar a rota para PROGRAMADA ao salvar"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <BotaoSalvar
           titulo={isEdicao ? "Atualizar" : "Salvar"}
           onPress={handleSalvar}
@@ -211,5 +257,19 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 30,
     textAlign: "center",
+  },
+  cardReinicio: {
+    borderWidth: 1.5,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  textoReinicioTitulo: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  textoReinicioSub: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });
