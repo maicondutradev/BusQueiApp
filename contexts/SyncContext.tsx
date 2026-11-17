@@ -5,7 +5,7 @@ import * as Crypto from "expo-crypto";
 import { collection, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db, auth } from "../services/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
-import { baixarDadosParaCache } from "../services/offlineCache";
+import { baixarDadosParaCache, comTimeout } from "../services/offlineCache";
 
 export type SyncStatus = "PENDENTE" | "SINCRONIZANDO";
 
@@ -66,7 +66,15 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsed = JSON.parse(queueJson);
           if (Array.isArray(parsed)) {
-            setSyncQueue(parsed);
+            const normalizada = parsed.map((item: SyncItem) =>
+              item.status === "SINCRONIZANDO"
+                ? { ...item, status: "PENDENTE" as SyncStatus }
+                : item
+            );
+            if (normalizada.some((item, idx) => item.status !== parsed[idx]?.status)) {
+              await AsyncStorage.setItem("@sync_queue", JSON.stringify(normalizada));
+            }
+            setSyncQueue(normalizada);
           } else {
             await AsyncStorage.removeItem("@sync_queue");
           }
@@ -106,6 +114,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
       let queueJson = await AsyncStorage.getItem("@sync_queue");
       let currentQueue: SyncItem[] = queueJson ? JSON.parse(queueJson) : [];
+      currentQueue = currentQueue.map((item) =>
+        item.status === "SINCRONIZANDO" ? { ...item, status: "PENDENTE" as SyncStatus } : item
+      );
       let pendentes = currentQueue.filter((item) => item.status === "PENDENTE");
 
       if (pendentes.length > 0) {
@@ -117,11 +128,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         for (const item of pendentes) {
           try {
             if (item.isExclusao && item.idExclusao) {
-              await deleteDoc(doc(db, item.collectionName, item.idExclusao));
+              await comTimeout(deleteDoc(doc(db, item.collectionName, item.idExclusao)));
             } else if (item.isEdicao && item.idEdicao) {
-              await updateDoc(doc(db, item.collectionName, item.idEdicao), item.data);
+              await comTimeout(updateDoc(doc(db, item.collectionName, item.idEdicao), item.data));
             } else {
-              await addDoc(collection(db, item.collectionName), item.data);
+              await comTimeout(addDoc(collection(db, item.collectionName), item.data));
             }
 
             currentQueue = currentQueue.filter((qItem) => qItem.id !== item.id);
@@ -204,7 +215,18 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       createdAt: Date.now(),
     };
 
-    const newQueue = [...syncQueue, newItem];
+    const queueJson = await AsyncStorage.getItem("@sync_queue");
+    let currentQueue: SyncItem[] = syncQueue;
+    if (queueJson) {
+      try {
+        const parsed = JSON.parse(queueJson);
+        if (Array.isArray(parsed)) {
+          currentQueue = parsed;
+        }
+      } catch {}
+    }
+
+    const newQueue = [...currentQueue, newItem];
     await salvarFila(newQueue);
 
     const net = await NetInfo.fetch();

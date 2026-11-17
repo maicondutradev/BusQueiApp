@@ -38,7 +38,8 @@ const isWebWithIndexedDB =
 const db = initializeFirestore(app, {
   localCache: isWebWithIndexedDB
     ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-    : memoryLocalCache()
+    : memoryLocalCache(),
+  ...(Platform.OS !== "web" ? { experimentalForceLongPolling: true } : {})
 });
 
 export { app, auth, db };

@@ -38,6 +38,23 @@ export async function carregarCacheLocal<T>(chave: string): Promise<T[]> {
   }
 }
 
+export function comTimeout<T>(promise: Promise<T>, ms = 15000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("FIREBASE_TIMEOUT"));
+    }, ms);
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export async function baixarDadosParaCache(userId: string): Promise<void> {
   if (!userId) return;
 
@@ -49,7 +66,7 @@ export async function baixarDadosParaCache(userId: string): Promise<void> {
   for (const col of colecoes) {
     try {
       const q = query(collection(db, col), where("userId", "==", userId));
-      const snapshot = await getDocs(q);
+      const snapshot = await comTimeout(getDocs(q));
       if (!snapshot.metadata.fromCache || snapshot.docs.length > 0) {
         const lista = snapshot.docs.map((docSnap) => ({
           id: docSnap.id,
